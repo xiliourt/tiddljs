@@ -6,6 +6,7 @@ Config file management and features are aimed to be similar to and/or the same a
 
 
 ### Required
+- ffmpeg convert m4a to flac (direct audio copy)
 - Make it honor config tags such as embed_lyrics, "download_video": false, etc 
 - Update downloadTest.js to fullTest.js and have it also check file metadata is correct (including testing the above)
 
