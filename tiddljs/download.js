@@ -8,6 +8,7 @@ import ffmpeg from "fluent-ffmpeg";
 import { join, dirname } from "path";
 import { promises as fs, createWriteStream } from "fs";
 import progress from "progress";
+import { XMLParser } from "fast-xml-parser";
 import NodeID3 from "node-id3";
 import axios from "axios";
 
@@ -300,8 +301,53 @@ export async function download(payload) {
  * @returns {[string[], string]}
  */
 function parseTrackStream(stream) {
-	const manifest = JSON.parse(Buffer.from(stream.manifest, "base64").toString());
-	return [manifest.urls, `.${manifest.mimeType.split("/")[1]}`];
+	const decodedManifest = Buffer.from(stream.manifest, "base64").toString();
+	let urls;
+	let codecs;
+	let fileExtension;
+
+	switch (stream.manifestMimeType) {
+		case "application/vnd.tidal.bts": {
+			const manifest = JSON.parse(decodedManifest);
+			urls = manifest.urls;
+			codecs = manifest.codecs;
+			break;
+		}
+		case "application/dash+xml": {
+			const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
+			const manifest = parser.parse(decodedManifest);
+			const representation = manifest.MPD.Period.AdaptationSet.Representation;
+			codecs = representation.codecs;
+			const segmentTemplate = representation.SegmentTemplate;
+			const urlTemplate = segmentTemplate.media;
+			const segmentTimeline = segmentTemplate.SegmentTimeline.S;
+			let total = 0;
+			const segments = Array.isArray(segmentTimeline) ? segmentTimeline : [segmentTimeline];
+			for (const element of segments) {
+				total += 1;
+				if (element.r) {
+					total += parseInt(element.r, 10);
+				}
+			}
+			urls = Array.from({ length: total }, (_, i) => urlTemplate.replace("$Number$", i + 1));
+			break;
+		}
+		default:
+			throw new Error(`Unknown manifest mime type: ${stream.manifestMimeType}`);
+	}
+
+	if (codecs === "flac") {
+		fileExtension = ".flac";
+		if (stream.audioQuality === "HI_RES_LOSSLESS") {
+			fileExtension = ".m4a";
+		}
+	} else if (codecs.startsWith("mp4")) {
+		fileExtension = ".m4a";
+	} else {
+		throw new Error(`Unknown codecs: ${codecs} (trackId: ${stream.trackId})`);
+	}
+
+	return [urls, fileExtension];
 }
 
 /**
