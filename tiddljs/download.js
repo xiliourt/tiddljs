@@ -40,16 +40,16 @@ async function handleItemDownload(
 		const description = `Track '${item.title}' ${stream.bitDepth ? `${stream.bitDepth} bit` : ""} ${stream.sampleRate ? `${stream.sampleRate} kHz` : ""}`;
 		const [urls, extension] = parseTrackStream(stream);
 
-		console.log(description);
+		console.info(description);
 
 		const response = await axios.get(urls[0], { responseType: "stream" });
 		const totalLength = parseInt(response.headers["content-length"], 10);
 		const bar = new progress("[:bar] :percent :etas", { total: totalLength });
 
-		console.log(`Item title: ${item.title}`);
+		console.info(`Item title: ${item.title}`);
 		const finalPath = join(path, `${filename}${extension}`);
 		await fs.mkdir(dirname(finalPath), { recursive: true });
-		console.log(`Saving file to: ${finalPath}`);
+		console.info(`Saving file to: ${finalPath}`);
 		const writer = createWriteStream(finalPath);
 
 		response.data.on("data", (chunk) => {
@@ -68,11 +68,11 @@ async function handleItemDownload(
 		const description = `Video '${item.title}' ${stream.videoQuality} quality`;
 		const [urls] = parseVideoStream(stream);
 
-		console.log(description);
+		console.info(description);
 
 		const finalPath = join(path, `${filename}.mp4`);
 		await fs.mkdir(dirname(finalPath), { recursive: true });
-		console.log(`Saving file to: ${finalPath}`);
+		console.info(`Saving file to: ${finalPath}`);
 
 		await new Promise((resolve, reject) => {
 			ffmpeg(urls[0])
@@ -106,11 +106,11 @@ export async function download(payload) {
 			const resource = new URL(resourceUrl);
 			const [type, id] = resource.pathname.split("/").slice(1);
 
-			console.log(`Type: ${type}, ID: ${id}`);
+			console.info(`Type: ${type}, ID: ${id}`);
 			switch (type) {
 				case "album": {
 					const album = await api.getAlbum(id);
-					console.log(`Album '${album.title}'`);
+					console.info(`Album '${album.title}'`);
 
 					let offset = 0;
 					while (true) {
@@ -121,9 +121,9 @@ export async function download(payload) {
 						}
 
 						for (const item of album_items.items) {
-							console.log("Item:", item.item);
+							console.info("Item:", item.item);
 							const filename = formatResource(config.template.album, item.item, album.artist.name);
-							console.log(`Filename: ${filename}`);
+							console.info(`Filename: ${filename}`);
 							const downloadedPath = await handleItemDownload(
 								item.item,
 								config.download.path,
@@ -148,41 +148,41 @@ export async function download(payload) {
 					break;
 				}
 				case "artist": {
-					console.log("Fetching artist details...");
+					console.info("Fetching artist details...");
 					const artist = await api.getArtist(id);
-					console.log(`Processing artist: '${artist.name}'`);
+					console.info(`Processing artist: '${artist.name}'`);
 
 					const getAllAlbums = async (singles) => {
 						let offset = 0;
 						const album_type = singles ? "EPSANDSINGLES" : "ALBUMS";
-						console.log(`Fetching artist albums of type: ${album_type}`);
+						console.info(`Fetching artist albums of type: ${album_type}`);
 
 						while (true) {
-							console.log(`Fetching artist albums with offset: ${offset}`);
+							console.info(`Fetching artist albums with offset: ${offset}`);
 							const artist_albums = await api.getArtistAlbums(id, 50, offset, album_type);
-							console.log(`Received ${artist_albums.items.length} albums.`);
+							console.info(`Received ${artist_albums.items.length} albums.`);
 
 							if (artist_albums.items.length === 0) {
-								console.log("No more albums found. Exiting loop.");
+								console.info("No more albums found. Exiting loop.");
 								break;
 							}
 
 							for (const album of artist_albums.items) {
-								console.log(`Processing album: '${album.title}'`);
+								console.info(`Processing album: '${album.title}'`);
 								const album_items = await api.getAlbumItemsCredits(album.id, 100, 0); // Fetch all tracks
-								console.log(`Found ${album_items.items.length} tracks in album '${album.title}'.`);
+								console.info(`Found ${album_items.items.length} tracks in album '${album.title}'.`);
 
 								for (const item of album_items.items) {
 									const filename = formatResource(config.template.album, item.item, album.artist.name);
-									console.log(`Generated filename: ${filename}`);
+									console.info(`Generated filename: ${filename}`);
 
 									const fullPath = join(config.download.path, filename);
 									if (await trackExists(item.item.audioQuality, download_quality, fullPath)) {
-										console.log(`Skipping '${filename}' because it already exists.`);
+										console.warn(`Skipping '${filename}' because it already exists.`);
 										continue;
 									}
 
-									console.log(`Starting download for '${filename}'...`);
+									console.info(`Starting download for '${filename}'...`);
 									const downloadedPath = await handleItemDownload(
 										item.item,
 										config.download.path,
@@ -195,12 +195,12 @@ export async function download(payload) {
 										download_quality
 									);
 									downloadedPaths.push(downloadedPath);
-									console.log(`Finished download for '${filename}'.`);
+									console.info(`Finished download for '${filename}'.`);
 								}
 							}
 
 							if (artist_albums.limit + artist_albums.offset >= artist_albums.totalNumberOfItems) {
-								console.log("Reached total number of albums. Exiting loop.");
+								console.info("Reached total number of albums. Exiting loop.");
 								break;
 							}
 
@@ -208,7 +208,7 @@ export async function download(payload) {
 						}
 					};
 
-					console.log(`Singles filter is set to: '${config.download.singles_filter}'`);
+					console.info(`Singles filter is set to: '${config.download.singles_filter}'`);
 					if (config.download.singles_filter === "include") {
 						await getAllAlbums(false); // Albums
 						await getAllAlbums(true); // EPs and Singles
@@ -216,7 +216,7 @@ export async function download(payload) {
 						await getAllAlbums(config.download.singles_filter === "only");
 					}
 
-					console.log(`Finished processing artist '${artist.name}'.`);
+					console.info(`Finished processing artist '${artist.name}'.`);
 					break;
 				}
 				case "track": {
@@ -255,7 +255,7 @@ export async function download(payload) {
 				}
 				case "playlist": {
 					const playlist = await api.getPlaylist(id);
-					console.log(`Playlist '${playlist.title}'`);
+					console.info(`Playlist '${playlist.title}'`);
 
 					let offset = 0;
 					while (true) {
