@@ -1,3 +1,4 @@
+
 // @ts-check
 
 import { TidalApi } from "./api.js";
@@ -23,7 +24,6 @@ import axios from "axios";
  * @param {boolean} embed_lyrics
  * @param {import("./models/constants.js").TrackQuality} download_quality
  */
-
 async function handleItemDownload(
 	item,
 	path,
@@ -37,43 +37,29 @@ async function handleItemDownload(
 ) {
 	if ("audioQuality" in item) {
 		const stream = await api.getTrackStream(item.id, download_quality);
-		const description = `Track '${item.title}' ${stream.bitDepth ? `${stream.bitDepth} bit` : ""} ${stream.sampleRate ? `${stream.sampleRate} kHz` : ""}`;
 		const [urls, extension] = parseTrackStream(stream);
-
-		console.info(description);
-
+		console.log(`Track: ${filename}`);
 		const response = await axios.get(urls[0], { responseType: "stream" });
 		const totalLength = parseInt(response.headers["content-length"], 10);
 		const bar = new progress("[:bar] :percent :etas", { total: totalLength });
-
-		console.info(`Item title: ${item.title}`);
 		const finalPath = join(path, `${filename}${extension}`);
 		await fs.mkdir(dirname(finalPath), { recursive: true });
-		console.info(`Saving file to: ${finalPath}`);
 		const writer = createWriteStream(finalPath);
-
 		response.data.on("data", (chunk) => {
 			bar.tick(chunk.length);
 			writer.write(chunk);
 		});
-
 		await new Promise((resolve, reject) => {
 			response.data.on("end", resolve);
 			response.data.on("error", reject);
 		});
-
 		return finalPath;
 	} else {
 		const stream = await api.getVideoStream(item.id);
-		const description = `Video '${item.title}' ${stream.videoQuality} quality`;
 		const [urls] = parseVideoStream(stream);
-
-		console.info(description);
-
+		console.log(`Video: ${filename}`);
 		const finalPath = join(path, `${filename}.mp4`);
 		await fs.mkdir(dirname(finalPath), { recursive: true });
-		console.info(`Saving file to: ${finalPath}`);
-
 		await new Promise((resolve, reject) => {
 			ffmpeg(urls[0])
 				.outputOptions("-c", "copy")
@@ -82,49 +68,39 @@ async function handleItemDownload(
 				.on("error", reject)
 				.save(finalPath);
 		});
-
 		return finalPath;
 	}
 }
 
-
 /**
  *
  * @param {{resourceUrls: string[]}} payload
- * @returns {Promise<string[]>}
+ * @returns {Promise<void>}
  */
-
 export async function download(payload) {
 	try {
 		const config = await getConfig();
 		const { resourceUrls } = payload;
 		const download_quality = ARG_TO_QUALITY[config.download.quality];
 		const api = new TidalApi(config.auth.token, config.auth.user_id, config.auth.country_code);
-		const downloadedPaths = [];
 
 		for (const resourceUrl of resourceUrls) {
 			const resource = new URL(resourceUrl);
 			const [type, id] = resource.pathname.split("/").slice(1);
 
-			console.info(`Type: ${type}, ID: ${id}`);
 			switch (type) {
 				case "album": {
 					const album = await api.getAlbum(id);
-					console.info(`Album '${album.title}'`);
-
+					console.log(`Album: ${album.title}`);
 					let offset = 0;
 					while (true) {
 						const album_items = await api.getAlbumItemsCredits(album.id, 100, offset);
-
 						if (album_items.items.length === 0) {
 							break;
 						}
-
 						for (const item of album_items.items) {
-							console.info("Item:", item.item);
 							const filename = formatResource(config.template.album, item.item, album.artist.name);
-							console.info(`Filename: ${filename}`);
-							const downloadedPath = await handleItemDownload(
+							await handleItemDownload(
 								item.item,
 								config.download.path,
 								filename,
@@ -135,55 +111,36 @@ export async function download(payload) {
 								config.download.embed_lyrics,
 								download_quality
 							);
-							downloadedPaths.push(downloadedPath);
 						}
-
 						if (album_items.limit + album_items.offset >= album_items.totalNumberOfItems) {
 							break;
 						}
-
 						offset += album_items.limit;
 					}
-
 					break;
 				}
 				case "artist": {
-					console.info("Fetching artist details...");
 					const artist = await api.getArtist(id);
-					console.info(`Processing artist: '${artist.name}'`);
-
+					console.log(`Artist: ${artist.name}`);
 					const getAllAlbums = async (singles) => {
 						let offset = 0;
 						const album_type = singles ? "EPSANDSINGLES" : "ALBUMS";
-						console.info(`Fetching artist albums of type: ${album_type}`);
-
 						while (true) {
-							console.info(`Fetching artist albums with offset: ${offset}`);
 							const artist_albums = await api.getArtistAlbums(id, 50, offset, album_type);
-							console.info(`Received ${artist_albums.items.length} albums.`);
-
 							if (artist_albums.items.length === 0) {
-								console.info("No more albums found. Exiting loop.");
 								break;
 							}
-
 							for (const album of artist_albums.items) {
-								console.info(`Processing album: '${album.title}'`);
-								const album_items = await api.getAlbumItemsCredits(album.id, 100, 0); // Fetch all tracks
-								console.info(`Found ${album_items.items.length} tracks in album '${album.title}'.`);
-
+								console.log(`Album: ${album.title}`);
+								const album_items = await api.getAlbumItemsCredits(album.id, 100, 0);
 								for (const item of album_items.items) {
 									const filename = formatResource(config.template.album, item.item, album.artist.name);
-									console.info(`Generated filename: ${filename}`);
-
 									const fullPath = join(config.download.path, filename);
 									if (await trackExists(item.item.audioQuality, download_quality, fullPath)) {
 										console.warn(`Skipping '${filename}' because it already exists.`);
 										continue;
 									}
-
-									console.info(`Starting download for '${filename}'...`);
-									const downloadedPath = await handleItemDownload(
+									await handleItemDownload(
 										item.item,
 										config.download.path,
 										filename,
@@ -194,35 +151,26 @@ export async function download(payload) {
 										config.download.embed_lyrics,
 										download_quality
 									);
-									downloadedPaths.push(downloadedPath);
-									console.info(`Finished download for '${filename}'.`);
 								}
 							}
-
 							if (artist_albums.limit + artist_albums.offset >= artist_albums.totalNumberOfItems) {
-								console.info("Reached total number of albums. Exiting loop.");
 								break;
 							}
-
 							offset += artist_albums.limit;
 						}
 					};
-
-					console.info(`Singles filter is set to: '${config.download.singles_filter}'`);
 					if (config.download.singles_filter === "include") {
-						await getAllAlbums(false); // Albums
-						await getAllAlbums(true); // EPs and Singles
+						await getAllAlbums(false);
+						await getAllAlbums(true);
 					} else {
 						await getAllAlbums(config.download.singles_filter === "only");
 					}
-
-					console.info(`Finished processing artist '${artist.name}'.`);
 					break;
 				}
 				case "track": {
 					const track = await api.getTrack(id);
 					const filename = formatResource(config.template.track, track);
-					const downloadedPath = await handleItemDownload(
+					await handleItemDownload(
 						track,
 						config.download.path,
 						filename,
@@ -233,13 +181,12 @@ export async function download(payload) {
 						config.download.embed_lyrics,
 						download_quality
 					);
-					downloadedPaths.push(downloadedPath);
 					break;
 				}
 				case "video": {
 					const video = await api.getVideo(id);
 					const filename = formatResource(config.template.video, video);
-					const downloadedPath = await handleItemDownload(
+					await handleItemDownload(
 						video,
 						config.download.path,
 						filename,
@@ -250,24 +197,26 @@ export async function download(payload) {
 						config.download.embed_lyrics,
 						download_quality
 					);
-					downloadedPaths.push(downloadedPath);
 					break;
 				}
 				case "playlist": {
 					const playlist = await api.getPlaylist(id);
-					console.info(`Playlist '${playlist.title}'`);
-
+					console.log(`Playlist: ${playlist.title}`);
 					let offset = 0;
 					while (true) {
 						const playlist_items = await api.getPlaylistItems(playlist.uuid, 50, offset);
-
 						if (playlist_items.items.length === 0) {
 							break;
 						}
-
 						for (const [index, item] of playlist_items.items.entries()) {
-							const filename = formatResource(config.template.playlist, item.item, undefined, playlist.title, offset + index + 1);
-							const downloadedPath = await handleItemDownload(
+							const filename = formatResource(
+								config.template.playlist,
+								item.item,
+								undefined,
+								playlist.title,
+								offset + index + 1
+							);
+							await handleItemDownload(
 								item.item,
 								config.download.path,
 								filename,
@@ -278,23 +227,18 @@ export async function download(payload) {
 								config.download.embed_lyrics,
 								download_quality
 							);
-							downloadedPaths.push(downloadedPath);
 						}
-
 						offset += playlist_items.limit;
 					}
-
 					break;
 				}
 			}
 		}
-		return downloadedPaths;
 	} catch (error) {
 		console.error(error);
 		throw error;
 	}
 }
-
 
 /**
  * @param {import("./models/api.js").TrackStream} stream
