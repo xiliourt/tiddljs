@@ -1,15 +1,11 @@
-This is very much in the development phase, it shoudln't be used in prod without heavy changes and further testing. It's more a proof of concept for now.
-
-The aim is to have a js version of tiddl, for use with web interfaces mainly (ie react + expressjs). Main features are intended as auth/login, auth/logout, auth/refresh and download. 
-
-Config file management and features are aimed to be similar to and/or the same as tiddl.
-
-
 ### Required
-- ffmpeg convert m4a to flac (direct audio copy)
-- Make it honor config tags such as embed_lyrics, "download_video": false, etc 
-- Update downloadTest.js to fullTest.js and have it also check file metadata is correct (including testing the above)
+- Ffmpeg currently broken (command fails to add metadata)
+  - Simply failing with an error about the output path, though it now looks fine? Unsure. Only real blocker currently. 
+- Add functionaility for ffmpeg m4a to flac
+- Ensure tags such as "embed lyrics" correctly honored
+- Update download.ts to support albums and artists (pulling all tracks/videos)
+- Update index.ts to support all URL types
 
 ### Possible Features
-- A solution to output periodic updates via means other than console, for easy monitoring in express.js / react webUIs
-- Show speed in MB/s in progress
+- A solution to output periodic updates via means other than console, for easy monitoring in express.js / react webUIs / via other js apps importing the module (.on('chunk', (staus, speed) => {}, .on('end', () => {}, etc)
+  - Add speed calculation to .on('chunk') (so when a chunk is received, speed is recalculated, and forwards the new speed + status)
