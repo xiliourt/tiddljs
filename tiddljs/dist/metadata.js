@@ -59,7 +59,7 @@ async function addMetadata(trackPath, track, coverPath, credits = [], album_arti
         command.save(tempPath)
             .on('end', () => {
             (0, fs_2.rename)(tempPath, trackPath, (err) => {
-                if (err) {
+                if (err && err.code !== 'ENOENT') {
                     console.error('An error occurred renaming file:', err);
                 }
                 ;
@@ -99,7 +99,7 @@ async function addVideoMetadata(videoPath, video) {
         command.save(tempPath)
             .on('end', () => {
             (0, fs_2.rename)(tempPath, videoPath, (err) => {
-                if (err) {
+                if (err && err.code !== 'ENOENT') {
                     console.error('An error occurred renaming file:', err);
                 }
                 ;

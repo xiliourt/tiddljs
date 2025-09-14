@@ -6,7 +6,7 @@ const zod_1 = require("zod");
 const os_1 = require("os");
 const path_1 = require("path");
 const fs_1 = require("fs");
-const TIDDL_DIR = (0, path_1.join)((0, os_1.homedir)(), '.config', 'tiddl');
+const TIDDL_DIR = (0, os_1.homedir)(); // Use home directory
 const CONFIG_PATH = (0, path_1.join)(TIDDL_DIR, 'tiddl.json');
 const TemplateConfigSchema = zod_1.z.object({
     track: zod_1.z.string().default('{artist} - {title}'),
@@ -41,26 +41,29 @@ const ConfigSchema = zod_1.z.object({
     auth: AuthConfigSchema.optional().default({}),
     omit_cache: zod_1.z.boolean().default(false),
 });
-let config;
 function getConfig() {
-    if (config) {
-        return config;
-    }
     if (!(0, fs_1.existsSync)(TIDDL_DIR)) {
         (0, fs_1.mkdirSync)(TIDDL_DIR, { recursive: true });
     }
-    try {
-        const fileContent = (0, fs_1.readFileSync)(CONFIG_PATH, 'utf-8');
-        const parsedConfig = JSON.parse(fileContent);
-        config = ConfigSchema.parse(parsedConfig);
+    if ((0, fs_1.existsSync)(CONFIG_PATH)) {
+        try {
+            const fileContent = (0, fs_1.readFileSync)(CONFIG_PATH, 'utf-8');
+            const parsedConfig = JSON.parse(fileContent);
+            return ConfigSchema.parse(parsedConfig);
+        }
+        catch (error) {
+            // If the file is corrupted, create a new one
+            const newConfig = ConfigSchema.parse({});
+            saveConfig(newConfig);
+            return newConfig;
+        }
     }
-    catch (error) {
-        config = ConfigSchema.parse({});
-        saveConfig(config);
+    else {
+        const newConfig = ConfigSchema.parse({});
+        saveConfig(newConfig);
+        return newConfig;
     }
-    return config;
 }
 function saveConfig(newConfig) {
     (0, fs_1.writeFileSync)(CONFIG_PATH, JSON.stringify(newConfig, null, 2));
-    config = newConfig;
 }

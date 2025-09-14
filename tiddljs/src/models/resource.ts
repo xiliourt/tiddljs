@@ -4,7 +4,7 @@ import { TrackQualitySchema } from './constants';
 export const ArtistSchema = z.object({
     id: z.number(),
     name: z.string(),
-    type: z.string(),
+    type: z.string().optional(),
     picture: z.string().nullable().optional(),
 });
 

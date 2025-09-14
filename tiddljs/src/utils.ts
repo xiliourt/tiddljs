@@ -13,11 +13,21 @@ export interface TidalResource {
 export function tidalResourceFromString(str: string): TidalResource {
     const url = new URL(str);
     const parts = url.pathname.split('/');
-    const type = parts[parts.length - 2] as ResourceType;
-    const id = parts[parts.length - 1];
+    const resourceTypes: ResourceType[] = ['track', 'video', 'album', 'playlist', 'artist'];
+    
+    let type: ResourceType | undefined;
+    let id: string | undefined;
 
-    if (!['track', 'video', 'album', 'playlist', 'artist'].includes(type)) {
-        throw new Error(`Invalid resource type: ${type}`);
+    for (let i = 0; i < parts.length; i++) {
+        if (resourceTypes.includes(parts[i] as ResourceType)) {
+            type = parts[i] as ResourceType;
+            id = parts[i + 1];
+            break;
+        }
+    }
+
+    if (!type || !id) {
+        throw new Error(`Could not parse resource from URL: ${str}`);
     }
 
     if (type !== 'playlist' && !/^\d+$/.test(id)) {
@@ -28,7 +38,7 @@ export function tidalResourceFromString(str: string): TidalResource {
 }
 
 export function sanitizeString(str: string): string {
-    return str.replace(/[\\/:\"'*?<>|]+/g, '');
+    return str.replace(/[\\\":'*?<>|]+/g, '');
 }
 
 export function formatResource(
@@ -40,25 +50,25 @@ export function formatResource(
         playlist_index?: number;
     } = {}
 ): string {
-    const artist = resource.artist ? sanitizeString(resource.artist.name) : '';
+    const artist = resource.artist ? resource.artist.name : '';
     const features = resource.artists
         .filter(a => a.name !== artist)
-        .map(a => sanitizeString(a.name));
+        .map(a => a.name);
 
     const resourceDict: Record<string, string | number> = {
         id: resource.id,
-        title: sanitizeString(resource.title),
+        title: resource.title,
         artist: artist,
         artists: [...features, artist].join(', '),
         features: features.join(', '),
-        album: resource.album ? sanitizeString(resource.album.title) : '',
+        album: resource.album ? resource.album.title : '',
         album_id: resource.album ? resource.album.id : '',
         number: resource.trackNumber,
         disc: resource.volumeNumber,
         date: resource.streamStartDate || '',
         year: resource.streamStartDate ? new Date(resource.streamStartDate).getFullYear() : '',
-        playlist: options.playlist_title ? sanitizeString(options.playlist_title) : '',
-        album_artist: options.album_artist ? sanitizeString(options.album_artist) : '',
+        playlist: options.playlist_title ? options.playlist_title : '',
+        album_artist: options.album_artist ? options.album_artist : '',
         playlist_number: options.playlist_index || 0,
         quality: '',
         version: '',
@@ -66,7 +76,7 @@ export function formatResource(
     };
 
     if ('audioQuality' in resource) { // Track
-        resourceDict.version = sanitizeString((resource as Track).version || '');
+        resourceDict.version = (resource as Track).version || '';
         resourceDict.quality = QUALITY_TO_ARG[(resource as Track).audioQuality];
         resourceDict.bpm = (resource as Track).bpm || '';
     } else { // Video
@@ -86,15 +96,8 @@ export function formatResource(
 
     formatted = formatted.trim();
 
-    const disallowedChars = /[\\:\"*?<>|]+/; // Corrected escaping for disallowedChars
-    if (disallowedChars.test(formatted)) {
-        throw new Error(`Formatted template contains disallowed characters: ${formatted}`);
-    }
-
-    const dir = dirname(formatted);
-    if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-    }
+    const pathComponents = formatted.split('/').map(c => sanitizeString(c));
+    formatted = pathComponents.join('/');
 
     return formatted;
 }

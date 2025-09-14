@@ -3,7 +3,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 
-const TIDDL_DIR = join(homedir(), '.config', 'tiddl');
+const TIDDL_DIR = homedir(); // Use home directory
 const CONFIG_PATH = join(TIDDL_DIR, 'tiddl.json');
 
 const TemplateConfigSchema = z.object({
@@ -46,28 +46,29 @@ const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 
-let config: Config;
-
 export function getConfig(): Config {
-    if (config) {
-        return config;
-    }
     if (!existsSync(TIDDL_DIR)) {
         mkdirSync(TIDDL_DIR, { recursive: true });
     }
 
-    try {
-        const fileContent = readFileSync(CONFIG_PATH, 'utf-8');
-        const parsedConfig = JSON.parse(fileContent);
-        config = ConfigSchema.parse(parsedConfig);
-    } catch (error) {
-        config = ConfigSchema.parse({});
-        saveConfig(config);
+    if (existsSync(CONFIG_PATH)) {
+        try {
+            const fileContent = readFileSync(CONFIG_PATH, 'utf-8');
+            const parsedConfig = JSON.parse(fileContent);
+            return ConfigSchema.parse(parsedConfig);
+        } catch (error) {
+            // If the file is corrupted, create a new one
+            const newConfig = ConfigSchema.parse({});
+            saveConfig(newConfig);
+            return newConfig;
+        }
+    } else {
+        const newConfig = ConfigSchema.parse({});
+        saveConfig(newConfig);
+        return newConfig;
     }
-    return config;
 }
 
 export function saveConfig(newConfig: Config) {
     writeFileSync(CONFIG_PATH, JSON.stringify(newConfig, null, 2));
-    config = newConfig;
 }

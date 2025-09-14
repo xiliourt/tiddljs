@@ -27,32 +27,100 @@ auth
 auth
     .command('refresh')
     .action(auth_1.refreshToken);
+async function downloadTrack(track) {
+    const api = new api_1.TidalApi();
+    const config = (0, config_1.getConfig)();
+    const stream = await api.getTrackStream(track.id, constants_1.ARG_TO_QUALITY[config.download.quality]);
+    const { data, fileExtension } = await (0, download_1.downloadTrackStream)(stream);
+    const filePath = (0, path_1.join)(config.download.path, `${(0, utils_1.formatResource)(config.template.track, track)}${fileExtension}`);
+    console.log(`Saving to ${filePath}`);
+    const dir = (0, path_1.dirname)(filePath);
+    if (!(0, fs_1.existsSync)(dir)) {
+        (0, fs_1.mkdirSync)(dir, { recursive: true });
+    }
+    (0, fs_1.writeFileSync)(filePath, data);
+    if (config.cover.save && track.album.cover) {
+        const cover = new metadata_1.Cover(track.album.cover);
+        const coverPath = await cover.save(config.download.path);
+        if (coverPath) {
+            await (0, metadata_1.addMetadata)(filePath, track, coverPath);
+        }
+    }
+    else {
+        await (0, metadata_1.addMetadata)(filePath, track);
+    }
+    console.log(`Downloaded ${track.title}`);
+}
+async function downloadVideo(video) {
+    const api = new api_1.TidalApi();
+    const config = (0, config_1.getConfig)();
+    const stream = await api.getVideoStream(video.id);
+    const data = await (0, download_1.downloadVideoStream)(stream);
+    const filePath = (0, path_1.join)(config.download.path, `${(0, utils_1.formatResource)(config.template.video, video)}.mp4`);
+    const dir = (0, path_1.dirname)(filePath);
+    if (!(0, fs_1.existsSync)(dir)) {
+        (0, fs_1.mkdirSync)(dir, { recursive: true });
+    }
+    (0, fs_1.writeFileSync)(filePath, data);
+    await (0, metadata_1.addVideoMetadata)(filePath, video);
+    console.log(`Downloaded ${video.title}`);
+}
 program.command('url <url>')
-    .description('Download a track or video from a URL.')
+    .description('Download a track, video, album, playlist or artist from a URL.')
     .action(async (url) => {
     const resource = (0, utils_1.tidalResourceFromString)(url);
     const api = new api_1.TidalApi();
-    const config = (0, config_1.getConfig)();
-    if (resource.type === 'track') {
-        const track = await api.getTrack(resource.id);
-        const stream = await api.getTrackStream(resource.id, constants_1.ARG_TO_QUALITY[config.download.quality]);
-        const { data, fileExtension } = await (0, download_1.downloadTrackStream)(stream);
-        const filePath = (0, path_1.join)(config.download.path, `${track.title}${fileExtension}`);
-        (0, fs_1.writeFileSync)(filePath, data);
-        if (config.cover.save && track.album.cover) {
-            const cover = new metadata_1.Cover(track.album.cover);
-            const coverPath = await cover.save(config.download.path);
-            if (coverPath) {
-                await (0, metadata_1.addMetadata)(filePath, track, coverPath);
+    switch (resource.type) {
+        case 'track':
+            const track = await api.getTrack(resource.id);
+            await downloadTrack(track);
+            break;
+        case 'video':
+            const video = await api.getVideo(resource.id);
+            await downloadVideo(video);
+            break;
+        case 'album':
+            const album = await api.getAlbum(resource.id);
+            console.log(`Downloading album: ${album.title}`);
+            const albumItems = await api.getAlbumItems(resource.id);
+            for (const item of albumItems.items) {
+                if (item.type === 'track') {
+                    await downloadTrack(item.item);
+                }
+                else if (item.type === 'video') {
+                    await downloadVideo(item.item);
+                }
             }
-        }
-        else {
-            await (0, metadata_1.addMetadata)(filePath, track);
-        }
-        console.log(`Downloaded ${track.title}`);
-    }
-    else {
-        console.log('Only track URLs are supported at the moment.');
+            break;
+        case 'playlist':
+            const playlist = await api.getPlaylist(resource.id);
+            console.log(`Downloading playlist: ${playlist.title}`);
+            const playlistItems = await api.getPlaylistItems(resource.id);
+            for (const item of playlistItems.items) {
+                if (item.type === 'track') {
+                    await downloadTrack(item.item);
+                }
+                else if (item.type === 'video') {
+                    await downloadVideo(item.item);
+                }
+            }
+            break;
+        case 'artist':
+            const artist = await api.getArtist(resource.id);
+            console.log(`Downloading artist: ${artist.name}`);
+            const artistAlbums = await api.getArtistAlbums(artist.id);
+            for (const album of artistAlbums.items) {
+                const albumItems = await api.getAlbumItems(album.id);
+                for (const item of albumItems.items) {
+                    if (item.type === 'track') {
+                        await downloadTrack(item.item);
+                    }
+                    else if (item.type === 'video') {
+                        await downloadVideo(item.item);
+                    }
+                }
+            }
+            break;
     }
 });
 program.command('file <file>')

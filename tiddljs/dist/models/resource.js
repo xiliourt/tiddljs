@@ -6,7 +6,7 @@ const constants_1 = require("./constants");
 exports.ArtistSchema = zod_1.z.object({
     id: zod_1.z.number(),
     name: zod_1.z.string(),
-    type: zod_1.z.string(),
+    type: zod_1.z.string().optional(),
     picture: zod_1.z.string().nullable().optional(),
 });
 exports.AlbumSchema = zod_1.z.object({

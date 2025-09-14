@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseTrackStream = parseTrackStream;
 exports.downloadTrackStream = downloadTrackStream;
 exports.parseVideoStream = parseVideoStream;
+exports.downloadVideoStream = downloadVideoStream;
 const m3u8_parser_1 = require("m3u8-parser");
 const axios_1 = __importDefault(require("axios"));
 const fast_xml_parser_1 = require("fast-xml-parser");
@@ -94,4 +95,13 @@ async function parseVideoStream(videoStream) {
         throw new Error('M3U8 Playlist is empty.');
     }
     return videoParser.manifest.segments.map((s) => s.uri).filter((url) => !!url);
+}
+async function downloadVideoStream(videoStream) {
+    const urls = await parseVideoStream(videoStream);
+    const streamData = [];
+    for (const url of urls) {
+        const response = await axios_1.default.get(url, { responseType: 'arraybuffer' });
+        streamData.push(response.data);
+    }
+    return Buffer.concat(streamData);
 }

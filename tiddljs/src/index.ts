@@ -4,12 +4,12 @@ import { Command } from 'commander';
 import { login, logout, refreshToken } from './auth';
 import { TidalApi } from './api';
 import { downloadTrackStream, downloadVideoStream } from './download';
-import { tidalResourceFromString } from './utils';
+import { tidalResourceFromString, formatResource } from './utils';
 import { getConfig } from './config';
 import { addMetadata, addVideoMetadata, Cover } from './metadata';
 import { ARG_TO_QUALITY } from './models/constants';
-import { join } from 'path';
-import { writeFileSync, readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { Track, Video } from './models/resource';
 
 const program = new Command();
@@ -39,7 +39,12 @@ async function downloadTrack(track: Track) {
     const config = getConfig();
     const stream = await api.getTrackStream(track.id, ARG_TO_QUALITY[config.download.quality]);
     const { data, fileExtension } = await downloadTrackStream(stream);
-    const filePath = join(config.download.path, `${track.title}${fileExtension}`);
+    const filePath = join(config.download.path, `${formatResource(config.template.track, track)}${fileExtension}`);
+    console.log(`Saving to ${filePath}`);
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+    }
     writeFileSync(filePath, data);
 
     if (config.cover.save && track.album.cover) {
@@ -59,7 +64,11 @@ async function downloadVideo(video: Video) {
     const config = getConfig();
     const stream = await api.getVideoStream(video.id);
     const data = await downloadVideoStream(stream);
-    const filePath = join(config.download.path, `${video.title}.mp4`);
+    const filePath = join(config.download.path, `${formatResource(config.template.video, video)}.mp4`);
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+    }
     writeFileSync(filePath, data);
     await addVideoMetadata(filePath, video);
     console.log(`Downloaded ${video.title}`);
@@ -107,7 +116,7 @@ program.command('url <url>')
             case 'artist':
                 const artist = await api.getArtist(resource.id);
                 console.log(`Downloading artist: ${artist.name}`);
-                const artistAlbums = await api.getArtistAlbums(resource.id);
+                const artistAlbums = await api.getArtistAlbums(artist.id);
                 for (const album of artistAlbums.items) {
                     const albumItems = await api.getAlbumItems(album.id);
                     for (const item of albumItems.items) {

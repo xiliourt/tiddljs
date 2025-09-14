@@ -14,14 +14,14 @@ describe('utils', () => {
         });
 
         it('should throw an error for an invalid resource type', () => {
-            expect(() => tidalResourceFromString('https://listen.tidal.com/invalid/12345')).toThrow('Invalid resource type: invalid');
+            expect(() => tidalResourceFromString('https://listen.tidal.com/invalid/12345')).toThrow('Could not parse resource from URL: https://listen.tidal.com/invalid/12345');
         });
     });
 
     describe('sanitizeString', () => {
         it('should remove invalid characters from a string', () => {
-            const sanitized = sanitizeString('a/b:c*d?e<f>g|h');
-            expect(sanitized).toBe('abcdefgh');
+            const sanitized = sanitizeString("a/b:c*d?e<f>g|h'");
+            expect(sanitized).toBe("a/bcdefgh");
         });
     });
 
