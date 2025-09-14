@@ -15,6 +15,7 @@ describe('metadata', () => {
     let outputOptions: jest.Mock;
     let audioCodec: jest.Mock;
     let input: jest.Mock;
+    let addOutputOption: jest.Mock;
 
     beforeEach(() => {
         const mockInstance = {
@@ -28,12 +29,14 @@ describe('metadata', () => {
             outputOptions: jest.fn().mockReturnThis(),
             audioCodec: jest.fn().mockReturnThis(),
             input: jest.fn().mockReturnThis(),
+            addOutputOption: jest.fn().mockReturnThis(),
         };
         on = mockInstance.on;
         save = mockInstance.save;
         outputOptions = mockInstance.outputOptions;
         audioCodec = mockInstance.audioCodec;
         input = mockInstance.input;
+        addOutputOption = mockInstance.addOutputOption;
 
         mockedFfmpeg.mockImplementation(() => mockInstance);
     });
@@ -51,9 +54,7 @@ describe('metadata', () => {
 
             await addMetadata('/test.flac', track);
 
-            expect(outputOptions).toHaveBeenCalledWith(expect.arrayContaining([
-                '-metadata', 'title=Test Track'
-            ]));
+            expect(addOutputOption).toHaveBeenCalledWith('-metadata', 'title=Test Track');
         });
     });
 

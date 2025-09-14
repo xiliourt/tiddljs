@@ -63,7 +63,7 @@ export async function addMetadata(
         command.save(tempPath)
             .on('end', () => {
 				rename(tempPath, trackPath, (err: NodeJS.ErrnoException | null) => { 
-					if (err) { console.error('An error occurred renaming file:', err) };
+					if (err && err.code !== 'ENOENT') { console.error('An error occurred renaming file:', err) };
 				});
                 resolve();
             })
@@ -103,7 +103,7 @@ export async function addVideoMetadata(videoPath: string, video: Video): Promise
         command.save(tempPath)
             .on('end', () => {
 				rename(tempPath, videoPath, (err: NodeJS.ErrnoException | null) => { 
-					if (err) { console.error('An error occurred renaming file:', err) };
+					if (err && err.code !== 'ENOENT') { console.error('An error occurred renaming file:', err) };
 				});
                 resolve();
             })

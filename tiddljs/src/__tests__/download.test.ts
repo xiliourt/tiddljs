@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { downloadTrackStream, parseTrackStream, parseVideoStream } from '../download';
+import { downloadTrackStream, parseTrackStream, parseVideoStream, downloadVideoStream } from '../download';
 import { TrackStream, VideoStream } from '../models/api';
 
 jest.mock('axios');
@@ -67,6 +67,38 @@ describe('download', () => {
 
             const urls = await parseVideoStream(videoStream);
             expect(urls).toEqual(['segment1.ts']);
+        });
+    });
+
+    describe('downloadVideoStream', () => {
+        it('should download a video stream', async () => {
+            const videoStream: VideoStream = {
+                manifest: Buffer.from(JSON.stringify({
+                    urls: ['http://test.com/playlist.m3u8'],
+                })).toString('base64'),
+            } as VideoStream;
+
+            const mainPlaylist = `
+                #EXTM3U
+                #EXT-X-STREAM-INF:BANDWIDTH=1280000
+                video.m3u8
+            `;
+            const videoPlaylist = `
+                #EXTM3U
+                #EXTINF:10,
+                segment1.ts
+                #EXTINF:10,
+                segment2.ts
+            `;
+
+            mockedAxios.get.mockResolvedValueOnce({ data: mainPlaylist });
+            mockedAxios.get.mockResolvedValueOnce({ data: videoPlaylist });
+            mockedAxios.get.mockResolvedValueOnce({ data: Buffer.from('segment 1 data') });
+            mockedAxios.get.mockResolvedValueOnce({ data: Buffer.from('segment 2 data') });
+
+            const data = await downloadVideoStream(videoStream);
+
+            expect(data.toString()).toBe('segment 1 datasegment 2 data');
         });
     });
 });

@@ -112,3 +112,15 @@ export async function parseVideoStream(videoStream: VideoStream): Promise<string
 
     return videoParser.manifest.segments.map((s: any) => s.uri).filter((url: any): url is string => !!url);
 }
+
+export async function downloadVideoStream(videoStream: VideoStream): Promise<Buffer> {
+    const urls = await parseVideoStream(videoStream);
+    const streamData: Buffer[] = [];
+
+    for (const url of urls) {
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        streamData.push(response.data);
+    }
+
+    return Buffer.concat(streamData);
+}
