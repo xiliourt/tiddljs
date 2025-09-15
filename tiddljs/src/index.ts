@@ -34,55 +34,91 @@ auth
     .command('refresh')
     .action(refreshToken);
 
+// So we can update this later if needed
+function progress(msg: string) { process.stdout.write(`${msg}\r`); }
+function clearProgress() { process.stdout.write(`\n`) }
+
 async function downloadTrack(track: Track) {
-    const api = new TidalApi();
-    const config = getConfig();
-    const stream = await api.getTrackStream(track.id, ARG_TO_QUALITY[config.download.quality]);
-    const filePath = parse(config.download.path + "/" + `${formatResource(config.template.track,track)}` + ".tmp");
-    if (!existsSync(filePath.dir)) {
-        mkdirSync(filePath.dir, { recursive: true });
-    }
+    try {
+        const api = new TidalApi();
+        const config = getConfig();
+        const stream = await api.getTrackStream(track.id, ARG_TO_QUALITY[config.download.quality]);
+        
+        const baseName = formatResource(config.template.track, track);
+        const finalFilePath = `${config.download.path}/${baseName}.flac`;
+        const tempFilePath = parse(`${config.download.path}/${baseName}.tmp`);
 
-    if (existsSync(filePath.dir + "/" + filePath.name + '.flac')) {
-        console.warn(`Skipped ${track.title} - exists`);
-        return;
-    }
-
-    console.log(`Downloading ${track.title}, saving to file, converting (if m4a), and adding metadata`);
-    const { data, fileExtension } = await downloadTrackStream(stream);
-    writeFileSync(format(filePath), data);
-
-    if (config.cover.save && track.album.cover) {
-        const cover = new Cover(track.album.cover);
-        const coverPath = await cover.save(config.download.path);
-        if (coverPath) {
-            await addTrackMetadata(format(filePath), track, fileExtension, coverPath);
+        if (!existsSync(tempFilePath.dir)) {
+            mkdirSync(tempFilePath.dir, { recursive: true });
+        } else if (existsSync(finalFilePath)) {
+            console.warn(`Skipped ${track.title} - exists`);
+            return;
         }
-    } else {
-        await addTrackMetadata(format(filePath), track, fileExtension);
-    }
 
-    console.log(`Conversion complete for ${track.title}`);
+        console.log(`TRACK: Starting download for: ${track.title}`);
+        const downloadTask = downloadTrackStream(stream);
+
+        downloadTask.on('progress', (update) => {
+            progress(`TRACK:  -> [${update.progress}%] ${update.message}`);
+        });
+
+        const { data, fileExtension } = await downloadTask;
+
+        writeFileSync(format(tempFilePath), data);
+        progress(`TRACK:  Adding metadata to ${track.title}`);
+        if (config.cover.save && track.album.cover) {
+            const cover = new Cover(track.album.cover);
+            const coverPath = await cover.save(config.download.path);
+            if (coverPath) {
+                await addTrackMetadata(format(tempFilePath), track, fileExtension, coverPath);
+            }
+        } else {
+            await addTrackMetadata(format(tempFilePath), track, fileExtension);
+        }
+        console.log(`✅ Successfully downloaded and processed: ${track.title}`);
+	clearProgress();
+    } catch (error) {
+        let errorMessage = 'An unknown error occurred.';
+        if (error instanceof Error) { errorMessage = error.message; }
+        else if (typeof error === 'string') { errorMessage = error; }
+        console.error(`\n❌ Failed to download ${track.title}. Error: ${errorMessage}`);
+    }
 }
 
 async function downloadVideo(video: Video) {
-    const api = new TidalApi();
-    const config = getConfig();
-    const stream = await api.getVideoStream(video.id);
-    const filePath = parse(config.download.path + "/" + `${formatResource(config.template.video, video)}` + ".mp4");
-    if (!existsSync(filePath.dir)) {
-        mkdirSync(filePath.dir, { recursive: true });
-    }
-    else if (existsSync(format(filePath))) {
-        console.warn(`Skipped ${video.title} - exists`)
-        return;
-    }
+    try {
+        const api = new TidalApi();
+        const config = getConfig();
+        const stream = await api.getVideoStream(video.id);
+        const baseName = formatResource(config.template.video, video);
+        const finalFilePath = `${config.download.path}/${baseName}.mp4`;
+        const tempFilePath = parse(`${config.download.path}/${baseName}.tmp`);
+        if (!existsSync(tempFilePath.dir)) {
+            mkdirSync(tempFilePath.dir, { recursive: true });
+        }
+        else if (existsSync(finalFilePath)) {
+            console.warn(`Skipped ${video.title} - exists`)
+            return;
+        }
 
-    const data = await downloadVideoStream(stream);
-    writeFileSync(format(filePath), data);
-    console.log(`Wrote ts file to ${format(filePath)}`)
-    await addVideoMetadata(format(filePath), video);
-    console.log(`Downloaded ${video.title}`);
+        const data = downloadVideoStream(stream);
+        data.on('progress', (update) => { 
+            progress(`VIDEO: -> [${update.progress}%] ${update.message}\r`) 
+        });
+
+        const videoBuffer = await data;
+        progress(`VIDEO: Download finished. Writing to file ${finalFilePath}`);
+        writeFileSync(finalFilePath, videoBuffer);
+        progress(`VIDEO: Adding metadata to ${video.title}`);
+        await addVideoMetadata(finalFilePath, video);
+	clearProgress();
+        console.log(`VIDEO: Downloaded ${video.title}`);
+    } catch (error) {
+        let errorMessage = 'An unknown error occurred.';
+        if (error instanceof Error) { errorMessage = error.message; } 
+        else if (typeof error === 'string') { errorMessage = error; }
+	console.error(`\n❌ VIDEO: Failed to download ${video.title}. Error: ${errorMessage}`);
+    }
 }
 
 program.command('url <url>')

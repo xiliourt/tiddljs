@@ -1,7 +1,9 @@
 import { TrackStream, VideoStream } from './models/api';
+import { MonitorablePromise } from './lib/MonitorablePromise';
 import { Parser } from 'm3u8-parser';
 import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
+import { TrackDownloadResult } from './types/promiseUpdates';
 
 interface TrackManifest {
     mimeType: string;
@@ -80,16 +82,42 @@ export function parseTrackStream(trackStream: TrackStream): { urls: string[]; fi
     return { urls, fileExtension };
 }
 
-export async function downloadTrackStream(trackStream: TrackStream): Promise<{ data: Buffer; fileExtension: string }> {
-    const { urls, fileExtension } = parseTrackStream(trackStream);
-    const streamData: Buffer[] = [];
+export function downloadTrackStream(trackStream: TrackStream): MonitorablePromise<TrackDownloadResult> {
+    // The return type is now a MonitorablePromise with our custom result type
+    return new MonitorablePromise<TrackDownloadResult>((resolve, reject, notify) => {
+        (async () => {
+            try {
+                notify({ progress: 0, message: 'Parsing track stream manifest...' });
+                const { urls, fileExtension } = await parseTrackStream(trackStream);
+                const totalUrls = urls.length;
 
-    for (const url of urls) {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        streamData.push(response.data);
-    }
+                if (totalUrls === 0) { return reject("No track segments to download"); }
 
-    return { data: Buffer.concat(streamData), fileExtension };
+                const streamData: Buffer[] = [];
+                let completedCount = 0;
+
+                notify({ progress: 0, message: `Found ${totalUrls} track segments.` });
+
+                for (const url of urls) {
+                    const response = await axios.get(url, { responseType: 'arraybuffer' });
+                    streamData.push(response.data as Buffer);
+                    completedCount++;
+
+                    const percentage = Math.round((completedCount / totalUrls) * 100);
+                    notify({
+                        progress: percentage,
+                        message: `Downloaded segment ${completedCount} of ${totalUrls}`
+                    });
+                }
+                
+                resolve({ data: Buffer.concat(streamData), fileExtension});
+
+            } catch (error) {
+                // If any step fails, reject the promise
+                reject(error);
+            }
+        })();
+    });
 }
 
 export async function parseVideoStream(videoStream: VideoStream): Promise<string[]> {
@@ -122,14 +150,39 @@ export async function parseVideoStream(videoStream: VideoStream): Promise<string
     return videoParser.manifest.segments.map((s: any) => s.uri).filter((url: any): url is string => !!url);
 }
 
-export async function downloadVideoStream(videoStream: VideoStream): Promise<Buffer> {
-    const urls = await parseVideoStream(videoStream);
-    const streamData: Buffer[] = [];
+export function downloadVideoStream(videoStream: VideoStream): MonitorablePromise<Buffer> {
+    return new MonitorablePromise<Buffer>((resolve, reject, notify) => {
+        (async () => {
+            try {
+                notify({ progress: 0, message: 'Parsing video stream manifest...' });
+                const urls = await parseVideoStream(videoStream);
+                const totalUrls = urls.length;
+                
+                if (totalUrls === 0) {
+                    notify({ progress: 100, message: 'No video segments to download.' });
+                    return resolve(Buffer.alloc(0)); // Resolve with an empty buffer
+                }
 
-    for (const url of urls) {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        streamData.push(response.data);
-    }
+                const streamData: Buffer[] = [];
+                let completedCount = 0;
 
-    return Buffer.concat(streamData);
+                notify({ progress: 0, message: `Found ${totalUrls} video segments.` });
+
+                for (const url of urls) {
+                    const response = await axios.get(url, { responseType: 'arraybuffer' });
+                    streamData.push(response.data as Buffer);
+                    completedCount++;
+
+                    const percentage = Math.round((completedCount / totalUrls) * 100);
+                    notify({
+                        progress: percentage,
+                        message: `Downloaded segment ${completedCount} of ${totalUrls}`
+                    });
+                }
+                resolve(Buffer.concat(streamData));
+            } catch (error) {
+                reject(error);
+            }
+        })();
+    });
 }
