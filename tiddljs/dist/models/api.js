@@ -60,12 +60,12 @@ exports.AlbumItemsCreditsSchema = ItemsSchema.extend({
     items: zod_1.z.array(zod_1.z.union([TrackItemWithCreditsSchema, VideoItemWithCreditsSchema])),
 });
 const PlaylistTrackSchema = resource_1.TrackSchema.extend({
-    dateAdded: zod_1.z.string().datetime(),
+    dateAdded: zod_1.z.coerce.date(),
     index: zod_1.z.number(),
     itemUuid: zod_1.z.string(),
 });
 const PlaylistVideoSchema = resource_1.VideoSchema.extend({
-    dateAdded: zod_1.z.string().datetime(),
+    dateAdded: zod_1.z.coerce.date(),
     index: zod_1.z.number(),
     itemUuid: zod_1.z.string(),
 });

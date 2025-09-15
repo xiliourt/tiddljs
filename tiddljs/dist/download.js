@@ -13,7 +13,15 @@ const fast_xml_parser_1 = require("fast-xml-parser");
 function parseManifestXML(xmlContent) {
     const parser = new fast_xml_parser_1.XMLParser({ ignoreAttributes: false });
     const jsonObj = parser.parse(xmlContent);
-    const representation = jsonObj['urn:mpeg:dash:schema:mpd:2011:MPD'].Period.AdaptationSet.Representation;
+    let mpd = jsonObj['urn:mpeg:dash:schema:mpd:2011:MPD'];
+    if (!mpd) {
+        mpd = jsonObj['MPD'];
+    }
+    if (!mpd) {
+        console.error("MPD not found in manifest. JSON object keys:", Object.keys(jsonObj));
+        throw new Error('Could not find MPD in manifest');
+    }
+    const representation = mpd.Period.AdaptationSet.Representation;
     const codecs = representation['@_codecs'];
     const segmentTemplate = representation.SegmentTemplate;
     const urlTemplate = segmentTemplate['@_media'];

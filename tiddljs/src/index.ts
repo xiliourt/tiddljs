@@ -6,9 +6,9 @@ import { TidalApi } from './api';
 import { downloadTrackStream, downloadVideoStream } from './download';
 import { tidalResourceFromString, formatResource } from './utils';
 import { getConfig } from './config';
-import { addMetadata, addVideoMetadata, Cover } from './metadata';
+import { addTrackMetadata, addVideoMetadata, Cover } from './metadata';
 import { ARG_TO_QUALITY } from './models/constants';
-import { join, dirname } from 'path';
+import { parse, format, join } from 'path';
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { Track, Video } from './models/resource';
 
@@ -38,39 +38,50 @@ async function downloadTrack(track: Track) {
     const api = new TidalApi();
     const config = getConfig();
     const stream = await api.getTrackStream(track.id, ARG_TO_QUALITY[config.download.quality]);
-    const { data, fileExtension } = await downloadTrackStream(stream);
-    const filePath = join(config.download.path, `${formatResource(config.template.track, track)}${fileExtension}`);
-    console.log(`Saving to ${filePath}`);
-    const dir = dirname(filePath);
-    if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
+    const filePath = parse(config.download.path + "/" + `${formatResource(config.template.track,track)}` + ".tmp");
+    if (!existsSync(filePath.dir)) {
+        mkdirSync(filePath.dir, { recursive: true });
     }
-    writeFileSync(filePath, data);
+
+    if (existsSync(filePath.dir + "/" + filePath.name + '.flac')) {
+        console.warn(`Skipped ${track.title} - exists`);
+        return;
+    }
+
+    console.log(`Downloading ${track.title}, saving to file, converting (if m4a), and adding metadata`);
+    const { data, fileExtension } = await downloadTrackStream(stream);
+    writeFileSync(format(filePath), data);
 
     if (config.cover.save && track.album.cover) {
         const cover = new Cover(track.album.cover);
         const coverPath = await cover.save(config.download.path);
         if (coverPath) {
-            await addMetadata(filePath, track, coverPath);
+            await addTrackMetadata(format(filePath), track, fileExtension, coverPath);
         }
     } else {
-        await addMetadata(filePath, track);
+        await addTrackMetadata(format(filePath), track, fileExtension);
     }
-    console.log(`Downloaded ${track.title}`);
+
+    console.log(`Conversion complete for ${track.title}`);
 }
 
 async function downloadVideo(video: Video) {
     const api = new TidalApi();
     const config = getConfig();
     const stream = await api.getVideoStream(video.id);
-    const data = await downloadVideoStream(stream);
-    const filePath = join(config.download.path, `${formatResource(config.template.video, video)}.mp4`);
-    const dir = dirname(filePath);
-    if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
+    const filePath = parse(config.download.path + "/" + `${formatResource(config.template.video, video)}` + ".mp4");
+    if (!existsSync(filePath.dir)) {
+        mkdirSync(filePath.dir, { recursive: true });
     }
-    writeFileSync(filePath, data);
-    await addVideoMetadata(filePath, video);
+    else if (existsSync(format(filePath))) {
+        console.warn(`Skipped ${video.title} - exists`)
+        return;
+    }
+
+    const data = await downloadVideoStream(stream);
+    writeFileSync(format(filePath), data);
+    console.log(`Wrote ts file to ${format(filePath)}`)
+    await addVideoMetadata(format(filePath), video);
     console.log(`Downloaded ${video.title}`);
 }
 

@@ -4,14 +4,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Cover = void 0;
-exports.addMetadata = addMetadata;
+exports.addTrackMetadata = addTrackMetadata;
 exports.addVideoMetadata = addVideoMetadata;
 const fluent_ffmpeg_1 = __importDefault(require("fluent-ffmpeg"));
 const axios_1 = __importDefault(require("axios"));
 const fs_1 = require("fs");
 const path_1 = require("path");
 const fs_2 = require("fs");
-async function addMetadata(trackPath, track, coverPath, credits = [], album_artist = '', lyrics = '') {
+async function addTrackMetadata(trackPath, track, fileExtension, coverPath, credits = [], album_artist = '', lyrics = '') {
     let command = (0, fluent_ffmpeg_1.default)(trackPath).audioCodec('copy');
     if (coverPath) {
         command = command.input(coverPath).outputOptions([
@@ -55,12 +55,18 @@ async function addMetadata(trackPath, track, coverPath, credits = [], album_arti
     });
     return new Promise((resolve, reject) => {
         // const tempPath: string = parse(trackPath).dir + "/" + track.id
-        const tempPath = trackPath + "tmp.flac";
+        const tempPath = trackPath + "tmp" + ".flac";
         command.save(tempPath)
             .on('end', () => {
-            (0, fs_2.rename)(tempPath, trackPath, (err) => {
+            (0, fs_2.rename)(tempPath, (0, path_1.parse)(trackPath).dir + "/" + (0, path_1.parse)(trackPath).name + ".flac", (err) => {
                 if (err && err.code !== 'ENOENT') {
                     console.error('An error occurred renaming file:', err);
+                }
+                ;
+            });
+            (0, fs_2.unlink)(trackPath, (err) => {
+                if (err && err.code !== 'ENOENT') {
+                    console.error('An error occurred removing m4a file:', err);
                 }
                 ;
             });

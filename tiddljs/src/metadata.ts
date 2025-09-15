@@ -4,11 +4,12 @@ import ffmpeg from 'fluent-ffmpeg';
 import axios from 'axios';
 import { createWriteStream, existsSync, mkdirSync, renameSync } from 'fs';
 import { join, parse } from 'path';
-import { rename } from 'fs';
+import { rename, unlink } from 'fs';
 
-export async function addMetadata(
+export async function addTrackMetadata(
     trackPath: string,
     track: Track,
+    fileExtension: string,
     coverPath?: string,
     credits: ItemWithCredits['credits'] = [],
     album_artist = '',
@@ -59,12 +60,15 @@ export async function addMetadata(
 	
     return new Promise((resolve, reject) => {
 		// const tempPath: string = parse(trackPath).dir + "/" + track.id
-		const tempPath: string = trackPath + "tmp.flac"
+		const tempPath: string = trackPath + "tmp" + ".flac";
         command.save(tempPath)
             .on('end', () => {
-				rename(tempPath, trackPath, (err: NodeJS.ErrnoException | null) => { 
+				rename(tempPath, parse(trackPath).dir + "/" + parse(trackPath).name + ".flac", (err: NodeJS.ErrnoException | null) => { 
 					if (err && err.code !== 'ENOENT') { console.error('An error occurred renaming file:', err) };
 				});
+				unlink(trackPath, (err: NodeJS.ErrnoException | null) => {
+                                        if (err && err.code !== 'ENOENT') { console.error('An error occurred removing m4a file:', err) };
+                                });
                 resolve();
             })
             .on('error', (err) => {
@@ -75,7 +79,7 @@ export async function addMetadata(
 }
 
 export async function addVideoMetadata(videoPath: string, video: Video): Promise<void> {
-	let command = ffmpeg(videoPath)            
+	let command = ffmpeg(videoPath)
 		.videoCodec('copy')
 		.audioCodec('copy')
 
@@ -99,18 +103,18 @@ export async function addVideoMetadata(videoPath: string, video: Video): Promise
     }
 	
     return new Promise((resolve, reject) => {
-		const tempPath: string = videoPath + "tmp.mp4"
+	const tempPath: string = videoPath + "tmp.mp4"
         command.save(tempPath)
             .on('end', () => {
-				rename(tempPath, videoPath, (err: NodeJS.ErrnoException | null) => { 
-					if (err && err.code !== 'ENOENT') { console.error('An error occurred renaming file:', err) };
-				});
+		rename(tempPath, videoPath, (err: NodeJS.ErrnoException | null) => { 
+		if (err && err.code !== 'ENOENT') { console.error('An error occurred renaming file:', err) };
+	    });
                 resolve();
-            })
-            .on('error', (err) => {
-                console.error(`Error adding metadata to ${videoPath}: ${err.message}`);
-                reject(err);
-            });
+        })
+        .on('error', (err) => {
+            console.error(`Error adding metadata to ${videoPath}: ${err.message}`);
+            reject(err);
+        });
     });
 }
 

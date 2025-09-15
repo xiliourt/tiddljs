@@ -71,13 +71,13 @@ export const AlbumItemsCreditsSchema = ItemsSchema.extend({
 });
 
 const PlaylistTrackSchema = TrackSchema.extend({
-    dateAdded: z.string().datetime(),
+    dateAdded: z.coerce.date(),
     index: z.number(),
     itemUuid: z.string(),
 });
 
 const PlaylistVideoSchema = VideoSchema.extend({
-    dateAdded: z.string().datetime(),
+    dateAdded: z.coerce.date(),
     index: z.number(),
     itemUuid: z.string(),
 });

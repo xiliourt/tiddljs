@@ -114,8 +114,8 @@ export const PlaylistSchema = z.object({
     creator: z.union([z.object({ id: z.number() }), z.record(z.any())]),
     description: z.string().nullable().optional(),
     duration: z.number(),
-    lastUpdated: z.string().datetime(),
-    created: z.string().datetime(),
+    lastUpdated: z.coerce.date().optional(),
+    created: z.coerce.date().optional(),
     type: z.string(),
     publicPlaylist: z.boolean(),
     url: z.string().url(),
@@ -123,14 +123,14 @@ export const PlaylistSchema = z.object({
     popularity: z.number(),
     squareImage: z.string(),
     promotedArtists: z.array(ArtistSchema),
-    lastItemAddedAt: z.string().datetime().nullable().optional(),
+    lastItemAddedAt: z.coerce.date().nullable().optional(),
 });
 
 export const ArtistFullSchema = ArtistSchema.extend({
     artistTypes: z.array(z.enum(['ARTIST', 'CONTRIBUTOR'])).optional(),
     url: z.string().url().optional(),
     picture: z.string().nullable().optional(),
-    selectedAlbumCoverFallback: z.string().optional(),
+    selectedAlbumCoverFallback: z.string().nullable().optional(),
     popularity: z.number().optional(),
     artistRoles: z.array(z.object({
         categoryId: z.number(),

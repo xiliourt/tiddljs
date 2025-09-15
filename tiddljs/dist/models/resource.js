@@ -111,8 +111,8 @@ exports.PlaylistSchema = zod_1.z.object({
     creator: zod_1.z.union([zod_1.z.object({ id: zod_1.z.number() }), zod_1.z.record(zod_1.z.any())]),
     description: zod_1.z.string().nullable().optional(),
     duration: zod_1.z.number(),
-    lastUpdated: zod_1.z.string().datetime(),
-    created: zod_1.z.string().datetime(),
+    lastUpdated: zod_1.z.coerce.date().optional(),
+    created: zod_1.z.coerce.date().optional(),
     type: zod_1.z.string(),
     publicPlaylist: zod_1.z.boolean(),
     url: zod_1.z.string().url(),
@@ -120,13 +120,13 @@ exports.PlaylistSchema = zod_1.z.object({
     popularity: zod_1.z.number(),
     squareImage: zod_1.z.string(),
     promotedArtists: zod_1.z.array(exports.ArtistSchema),
-    lastItemAddedAt: zod_1.z.string().datetime().nullable().optional(),
+    lastItemAddedAt: zod_1.z.coerce.date().nullable().optional(),
 });
 exports.ArtistFullSchema = exports.ArtistSchema.extend({
     artistTypes: zod_1.z.array(zod_1.z.enum(['ARTIST', 'CONTRIBUTOR'])).optional(),
     url: zod_1.z.string().url().optional(),
     picture: zod_1.z.string().nullable().optional(),
-    selectedAlbumCoverFallback: zod_1.z.string().optional(),
+    selectedAlbumCoverFallback: zod_1.z.string().nullable().optional(),
     popularity: zod_1.z.number().optional(),
     artistRoles: zod_1.z.array(zod_1.z.object({
         categoryId: zod_1.z.number(),
