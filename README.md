@@ -14,20 +14,14 @@
 
 # Further updates I'll work on
 ## Tier 1
-- Test if API_LIMITS are actually accurate (copied them from tiddl api.py to api.ts). If accurate;
-	- Add offset handling to bypass API limits
-		- Add offset handling logic to recall with offset if limit is reached but more items left
-		    - album/platlist_items = api.getAlbumItemsCredits(album.id, offset=offset) // Number of items in album
-	    	- playlist_items = api.getPlaylistItems(playlist.id, offset=offset) // Number of items in playlist
-		      - keeps incrementing offset until album_items.limit + album_items.offset > album_items.totalNumberOfItems // Until all albums / playlist items scraped
-		        - offset += album_items.limit / offset += playlist_items.limit each loop
-		    - artist_albums = api.getArtistAlbums(resource.id, offset=offset, config.download.singles_filter === "EPSANDSINGLES" / "ALBUMS")
-		      - Consider singles_filter logic
-		        - Ensure both "EPSANDSINGLES" and "ALBUMS" totalled if singles_filter: "include"
-		        - Ensure only "EPSANDSINGLES" totalled if singles_filter: "only"
-		        - Ensure only "ALBUMS" totalled singles_filter: "none"
-		      - Keep incrementing until artist_albums.limit + artist_albums.offset > artist_albums.totalNumberOfItems
-		        - offset += artist_albums.limit each loop
+- Add offset handling to getArtistAlbums
+	- Change to two seperate calls, based on if singles_filter is set
+ 		- Note when downloading singles or albums 
+			- Ensure both "EPSANDSINGLES" and "ALBUMS" if singles_filter: "include"
+			- Ensure only "EPSANDSINGLES" totalled if singles_filter: "only"
+			- Ensure only "ALBUMS" totalled singles_filter: "none"
+	- Keep incrementing until artist_albums.limit + artist_albums.offset > artist_albums.totalNumberOfItems
+		- offset += artist_albums.limit each loop
 - Further testing / edge cases / bugsplatting / etc.
 
 ## Tier 2
