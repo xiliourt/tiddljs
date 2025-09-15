@@ -34,37 +34,42 @@ export async function getDeviceAuth(): Promise<AuthDeviceResponse> {
     }
 }
 
-export async function login(): Promise<void> {
+export async function login(): Promise<{ verificationUriComplete: string; loginPromise: Promise<void> }> {
     const deviceAuth = await getDeviceAuth();
-    console.log(`Please visit ${deviceAuth.verificationUriComplete} to authenticate.`);
 
-    const interval = deviceAuth.interval * 1000;
-    const expires = Date.now() + deviceAuth.expiresIn * 1000;
+    const loginPromise = new Promise<void>(async (resolve, reject) => {
+        const interval = deviceAuth.interval * 1000;
+        const expires = Date.now() + deviceAuth.expiresIn * 1000;
 
-    while (Date.now() < expires) {
-        await new Promise(resolve => setTimeout(resolve, interval));
-        try {
-            const token = await getToken(deviceAuth.deviceCode);
-            const config = getConfig();
-            config.auth = {
-                token: token.access_token,
-                refresh_token: token.refresh_token,
-                expires: Date.now() + token.expires_in * 1000,
-                user_id: token.user_id.toString(),
-                country_code: token.user.countryCode,
-            };
-            saveConfig(config);
-            console.log('Successfully authenticated.');
-            return;
-        } catch (error) {
-            if (error instanceof AuthError && error.error === 'authorization_pending') {
-                // continue polling
-            } else {
-                throw error;
+        while (Date.now() < expires) {
+            await new Promise(resolve => setTimeout(resolve, interval));
+            try {
+                const token = await getToken(deviceAuth.deviceCode);
+                const config = getConfig();
+                config.auth = {
+                    token: token.access_token,
+                    refresh_token: token.refresh_token,
+                    expires: Date.now() + token.expires_in * 1000,
+                    user_id: token.user_id.toString(),
+                    country_code: token.user.countryCode,
+                };
+                saveConfig(config);
+                console.log('Successfully authenticated.');
+                resolve();
+                return;
+            } catch (error) {
+                if (error instanceof AuthError && error.error === 'authorization_pending') {
+                    // continue polling
+                } else {
+                    reject(error);
+                    return;
+                }
             }
         }
-    }
-    throw new Error('Authentication timed out.');
+        reject(new Error('Authentication timed out.'));
+    });
+
+    return { verificationUriComplete: deviceAuth.verificationUriComplete, loginPromise };
 }
 
 async function getToken(deviceCode: string): Promise<AuthResponseWithRefresh> {

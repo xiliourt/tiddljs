@@ -14,7 +14,11 @@ const auth = program.command('auth')
     .description('Authenticate with Tidal.');
 auth
     .command('login')
-    .action(auth_1.login);
+    .action(async () => {
+    const { verificationUriComplete, loginPromise } = await (0, auth_1.login)();
+    console.log(`Please visit ${verificationUriComplete} to authenticate.`);
+    await loginPromise;
+});
 auth
     .command('logout')
     .action(auth_1.logout);

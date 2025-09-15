@@ -16,7 +16,11 @@ const auth = program.command('auth')
 
 auth
     .command('login')
-    .action(login);
+    .action(async () => {
+        const { verificationUriComplete, loginPromise } = await login();
+        console.log(`Please visit ${verificationUriComplete} to authenticate.`);
+        await loginPromise;
+    });
 
 auth
     .command('logout')
