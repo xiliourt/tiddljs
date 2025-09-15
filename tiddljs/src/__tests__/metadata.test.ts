@@ -1,6 +1,6 @@
 import ffmpeg from 'fluent-ffmpeg';
 import axios from 'axios';
-import { addMetadata, Cover } from '../metadata';
+import { addTrackMetadata, Cover } from '../metadata';
 import { Track } from '../models/resource';
 
 jest.mock('fluent-ffmpeg');
@@ -41,7 +41,7 @@ describe('metadata', () => {
         mockedFfmpeg.mockImplementation(() => mockInstance);
     });
 
-    describe('addMetadata', () => {
+    describe('addTrackMetadata', () => {
         it('should call ffmpeg with the correct metadata', async () => {
             const track: Track = {
                 id: 1, title: 'Test Track', duration: 180, replayGain: -5, peak: -1, allowStreaming: true, streamReady: true, adSupportedStreamReady: false, djReady: false, stemReady: false,
@@ -52,7 +52,7 @@ describe('metadata', () => {
                 album: { id: 1, title: 'Test Album', cover: null, vibrantColor: null, videoCover: null },
             };
 
-            await addMetadata('/test.flac', track);
+            await addTrackMetadata('/test.flac', track, '.flac');
 
             expect(addOutputOption).toHaveBeenCalledWith('-metadata', 'title=Test Track');
         });
