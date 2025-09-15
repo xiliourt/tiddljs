@@ -25,6 +25,7 @@
 - Further testing / edge cases / bugsplatting / etc.
 
 ## Tier 2
+- Multi threading???
 - Keep track of download speed (MB/s), add to Progress
 	- Keep track of chunks downloaded and chunk size each chunk, calculating it against time elapsed into MB/s
 	- Update Track/Video Progress type and call backs to add 'speed' (MB/s)
