@@ -27,8 +27,8 @@ async function downloadTrack(track: Track, onProgress?: ProgressCb, template?: s
     try {
         const stream = await api.getTrackStream(track.id, ARG_TO_QUALITY[config.download.quality]);
         const baseName = formatResource(template || config.template.track, track, options);
-        const finalFilePath = `${config.download.path}/${baseName}.flac`;
-        const tempFilePath = parse(`${config.download.path}/${baseName}.tmp`);
+        const finalFilePath = join(config.download.path, `${baseName}.flac`);
+        const tempFilePath = parse(join(config.download.path, `${baseName}.tmp`));
 
         if (!existsSync(tempFilePath.dir)) {
             mkdirSync(tempFilePath.dir, { recursive: true });
@@ -85,8 +85,8 @@ async function downloadVideo(video: Video, onProgress?: ProgressCb, template?: s
     try {
         const stream = await api.getVideoStream(video.id);
         const baseName = formatResource(template || config.template.video, video, options);
-        const finalFilePath = `${config.download.path}/${baseName}.mp4`;
-        const tempFilePath = parse(`${config.download.path}/${baseName}.tmp`);
+        const finalFilePath = join(config.download.path, `${baseName}.mp4`);
+        const tempFilePath = parse(join(config.download.path, `${baseName}.tmp`));
         if (!existsSync(tempFilePath.dir)) {
             mkdirSync(tempFilePath.dir, { recursive: true });
         }
@@ -174,56 +174,71 @@ async function downloadPlaylist(playlist: Playlist, onProgress?: ProgressCb): Pr
     if (onProgress) onProgress({ type: 'playlist', id: playlist.uuid, title: playlist.title, progress: 100, message: 'Downloaded all items' });
 }
 
-async function getArtistAlbums(artistId: string | number) {
+async function downloadArtistAlbums(artistId: string | number, singles: boolean, onProgress?: ProgressCb): Promise<void> {
     const api = new TidalApi();
-    const config = getConfig();
-    const albums = await api.getArtistAlbums(artistId, undefined, 0, 'ALBUMS');
-    if (config.download.singles_filter === 'include') {
-        const singles = await api.getArtistAlbums(artistId, undefined, 0, 'EPSANDSINGLES');
-        albums.items.push(...singles.items);
-    } else if (config.download.singles_filter === 'only') {
-        return await api.getArtistAlbums(artistId, undefined, 0, 'EPSANDSINGLES');
+    const artist = await api.getArtist(artistId);
+    let offset = 0;
+    while (true) {
+        const albums = await api.getArtistAlbums(artistId, undefined, offset, singles ? 'EPSANDSINGLES' : 'ALBUMS');
+        for (const album of albums.items) {
+            await downloadAlbum(album, (progress) => {
+                if (onProgress) onProgress({ type: 'artist', id: artist.id, title: artist.name, progress: progress.progress, message: `Downloading album ${album.title}: ${progress.message}` });
+            });
+        }
+        offset += albums.limit;
+        if (offset > albums.totalNumberOfItems) { break; }
     }
-    return albums;
 }
 
 export async function downloadUrl(url: string, onProgress?: ProgressCb) {
     const resource = tidalResourceFromString(url);
     const api = new TidalApi();
+    const config = getConfig();
 
     switch (resource.type) {
-        case 'track':
+        case 'track': {
             const track = await api.getTrack(resource.id);
+            const album = await api.getAlbum(track.album.id);
             await downloadTrack(track, (progress) => {
                 if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: progress.progress, message: progress.message });
-            });
+            }, undefined, { album_artist: album.artist.name });
             break;
-        case 'video':
-            const config = getConfig();
+        }
+        case 'video': {
             if (!config.download.download_video) {
                 console.warn('Skipping video download because download_video is disabled in config.');
                 break;
             }
             const video = await api.getVideo(resource.id);
-            await downloadVideo(video, (progress) => {
-                if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: progress.progress, message: progress.message });
-            });
+            if (video.album) {
+                const videoAlbum = await api.getAlbum(video.album.id);
+                await downloadVideo(video, (progress) => {
+                    if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: progress.progress, message: progress.message });
+                }, undefined, { album_artist: videoAlbum.artist.name });
+            } else {
+                await downloadVideo(video, (progress) => {
+                    if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: progress.progress, message: progress.message });
+                });
+            }
             break;
-        case 'album':
+        }
+        case 'album': {
             const album = await api.getAlbum(resource.id);
             await downloadAlbum(album, onProgress);
             break;
+        }
         case 'playlist':
             const playlist = await api.getPlaylist(resource.id);
             await downloadPlaylist(playlist, onProgress);
             break;
         case 'artist':
-            const artist = await api.getArtist(resource.id);
-            const artistAlbums = await getArtistAlbums(resource.id);
-            for (const album of artistAlbums.items) {
-                await downloadAlbum(album, (progress) => {
-                    if (onProgress) onProgress({ type: 'artist', id: artist.id, title: artist.name, progress: progress.progress, message: `Downloading album ${album.title}: ${progress.message}` });
-                });
+            if (config.download.singles_filter === 'only') {
+                await downloadArtistAlbums(resource.id, true, onProgress);
+            } else if (config.download.singles_filter === 'include') {
+                await downloadArtistAlbums(resource.id, false, onProgress);
+                await downloadArtistAlbums(resource.id, true, onProgress);
+            } else {
+                await downloadArtistAlbums(resource.id, false, onProgress);
             }
             break;
     }
