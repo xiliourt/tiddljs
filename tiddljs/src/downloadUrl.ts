@@ -15,14 +15,14 @@ export interface Progress {
     title: string;
     progress: number;
     message: string;
-    albumId?: string | number;
+    chain: { type: 'artist' | 'album' | 'playlist'; id: string | number; }[];
 }
 
 export interface ProgressCb {
     (progress: Progress): void;
 }
 
-async function downloadTrack(track: Track, onProgress?: ProgressCb, template?: string, options?: { album_artist?: string; playlist_title?: string; playlist_index?: number; }): Promise<void> {
+async function downloadTrack(track: Track, onProgress?: ProgressCb, template?: string, options?: { album_artist?: string; playlist_title?: string; playlist_index?: number; }, chain: { type: 'artist' | 'album' | 'playlist'; id: string | number; }[] = []): Promise<void> {
     const api = new TidalApi();
     const config = getConfig();
     try {
@@ -34,22 +34,22 @@ async function downloadTrack(track: Track, onProgress?: ProgressCb, template?: s
         if (!existsSync(tempFilePath.dir)) {
             mkdirSync(tempFilePath.dir, { recursive: true });
         } else if (existsSync(finalFilePath)) {
-            if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: `Skipped ${track.title} - exists`});
+            if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: `Skipped ${track.title} - exists`, chain});
             return;
         }
 
-        if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 0, message: 'Starting download' });
+        if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 0, message: 'Starting download', chain });
 
         const downloadTask = downloadTrackStream(stream);
 
         downloadTask.on('progress', (update) => {
-            if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: update.progress, message: update.message });
+            if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: update.progress, message: update.message, chain });
         });
 
         const data = await downloadTask;
 
         writeFileSync(format(tempFilePath), data);
-        if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: 'Adding metadata' });
+        if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: 'Adding metadata', chain });
 
         let lyrics: string | undefined;
         if (config.download.embed_lyrics) {
@@ -70,17 +70,18 @@ async function downloadTrack(track: Track, onProgress?: ProgressCb, template?: s
         } else {
             await addTrackMetadata(format(tempFilePath), track, undefined, [], options?.album_artist, lyrics);
         }
-        if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: 'Downloaded and processed' });
+        if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: 'Downloaded and processed', chain });
     } catch (error) {
         let errorMessage = 'An unknown error occurred.';
         if (error instanceof Error) { errorMessage = error.message; }
         else if (typeof error === 'string') { errorMessage = error; }
-        if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: `Failed to download: ${errorMessage}` });
-        else console.error(`\n❌ Failed to download ${track.title}. Error: ${errorMessage}`);
+        if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: `Failed to download: ${errorMessage}`, chain });
+        else console.error(`
+❌ Failed to download ${track.title}. Error: ${errorMessage}`);
     }
 }
 
-async function downloadVideo(video: Video, onProgress?: ProgressCb, template?: string, options?: { album_artist?: string; playlist_title?: string; playlist_index?: number; }): Promise<void> {
+async function downloadVideo(video: Video, onProgress?: ProgressCb, template?: string, options?: { album_artist?: string; playlist_title?: string; playlist_index?: number; }, chain: { type: 'artist' | 'album' | 'playlist'; id: string | number; }[] = []): Promise<void> {
     const api = new TidalApi();
     const config = getConfig();
     try {
@@ -93,96 +94,106 @@ async function downloadVideo(video: Video, onProgress?: ProgressCb, template?: s
         }
         else if (existsSync(finalFilePath)) {
             console.warn(`Skipped ${video.title} - exists`)
-            if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: `Skipped ${video.title} - exists`})
+            if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: `Skipped ${video.title} - exists`, chain});
             return;
         }
 
-        if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 0, message: 'Starting download' });
+        if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 0, message: 'Starting download', chain });
         const data = downloadVideoStream(stream);
         data.on('progress', (update) => {
-            if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: update.progress, message: update.message });
+            if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: update.progress, message: update.message, chain });
         });
 
         const videoBuffer = await data;
-        if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: 'Download finished. Writing to file' });
+        if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: 'Download finished. Writing to file', chain });
         writeFileSync(finalFilePath, videoBuffer);
-        if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: 'Adding metadata' });
+        if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: 'Adding metadata', chain });
         await addVideoMetadata(finalFilePath, video);
-        if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: 'Downloaded and processed' });
+        if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: 'Downloaded and processed', chain });
     } catch (error) {
         let errorMessage = 'An unknown error occurred.';
         if (error instanceof Error) { errorMessage = error.message; }
         else if (typeof error === 'string') { errorMessage = error; }
-        if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: `Failed to download: ${errorMessage}` });
-        else console.error(`\n❌ Failed to download ${video.title}. Error: ${errorMessage}`);
+        if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: `Failed to download: ${errorMessage}`, chain });
+        else console.error(`
+❌ Failed to download ${video.title}. Error: ${errorMessage}`);
     }
 }
 
-async function downloadAlbum(album: Album, onProgress?: ProgressCb): Promise<void> {
+async function downloadAlbum(album: Album, onProgress?: ProgressCb, chain: { type: 'artist' | 'album' | 'playlist'; id: string | number; }[] = []): Promise<void> {
     const api = new TidalApi();
     const config = getConfig();
     const fullAlbum = await api.getAlbum(album.id);
     const albumItemsLength = await api.getAlbumItems(album.id);
     let index=0;
     let offset=0;
-    if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: 0, message: `Downloading album with ${albumItemsLength.totalNumberOfItems} items` });
+    if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: 0, message: `Downloading album with ${albumItemsLength.totalNumberOfItems} items`, chain });
+    const newChain = [...chain, { type: 'album' as const, id: album.id }];
     while (true) {
         const albumItems = await api.getAlbumItems(album.id, undefined, offset);
         for (const [num, item] of albumItems.items.entries()) {
             const itemProgress = (index / albumItems.totalNumberOfItems) * 100;
             if (item.type === 'track') {
                 await downloadTrack(item.item as Track, (progress) => {
-                    if (onProgress) onProgress({ ...progress, albumId: album.id, message: `Downloading track ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
-                }, getPath('album', item.item as Track, { album_artist: fullAlbum.artist.name }));
+                    if (onProgress) onProgress({ ...progress, message: `Downloading track ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
+                }, getPath('album', item.item as Track, { album_artist: fullAlbum.artist.name }), undefined, newChain);
             } else if (item.type === 'video' && config.download.download_video) {
                 await downloadVideo(item.item as Video, (progress) => {
-                    if (onProgress) onProgress({ ...progress, albumId: album.id, message: `Downloading video ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
-                }, getPath('album', item.item as Video, { album_artist: fullAlbum.artist.name }));
+                    if (onProgress) onProgress({ ...progress, message: `Downloading video ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
+                }, getPath('album', item.item as Video, { album_artist: fullAlbum.artist.name }), undefined, newChain);
             }
             index+=1;
         }
         offset+=albumItems.limit
         if (offset > albumItems.totalNumberOfItems) { break; }
     }
-    if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: 100, message: 'Downloaded all items' });
+    if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: 100, message: 'Downloaded all items', chain });
 }
 
-async function downloadPlaylist(playlist: Playlist, onProgress?: ProgressCb): Promise<void> {
+async function downloadPlaylist(playlist: Playlist, onProgress?: ProgressCb, chain: { type: 'artist' | 'album' | 'playlist'; id: string | number; }[] = []): Promise<void> {
     const api = new TidalApi();
     const config = getConfig();
     const playlistLength = await api.getPlaylistItems(playlist.uuid);
-    if (onProgress) onProgress({ type: 'playlist', id: playlist.uuid, title: playlist.title, progress: 0, message: `Downloading playlist with ${playlistLength.totalNumberOfItems} tems` });
+    if (onProgress) onProgress({ type: 'playlist', id: playlist.uuid, title: playlist.title, progress: 0, message: `Downloading playlist with ${playlistLength.totalNumberOfItems} tems`, chain });
     let offset = 0;
     let index = 0;
+    const newChain = [...chain, { type: 'playlist' as const, id: playlist.uuid }];
     while (true) {
         const playlistItems = await api.getPlaylistItems(playlist.uuid, undefined, offset);
         for (const [num, item] of playlistItems.items.entries()) {
             const itemProgress = (index / playlistItems.totalNumberOfItems) * 100;
             if (item.type === 'track') {
-                await downloadTrack(item.item as Track, onProgress, getPath('playlist', item.item as Track, { playlist_title: playlist.title, playlist_index: index + 1 }));
+                await downloadTrack(item.item as Track, (progress) => {
+                    if (onProgress) onProgress({ ...progress, message: `Downloading track ${index + 1}/${playlistItems.totalNumberOfItems}: ${item.item.title}` });
+                }, getPath('playlist', item.item as Track, { playlist_title: playlist.title, playlist_index: index + 1 }), undefined, newChain);
             } else if (item.type === 'video' && config.download.download_video) {
-                await downloadVideo(item.item as Video, onProgress, getPath('playlist', item.item as Video, { playlist_title: playlist.title, playlist_index: index + 1 }));
+                await downloadVideo(item.item as Video, (progress) => {
+                    if (onProgress) onProgress({ ...progress, message: `Downloading video ${index + 1}/${playlistItems.totalNumberOfItems}: ${item.item.title}` });
+                }, getPath('playlist', item.item as Video, { playlist_title: playlist.title, playlist_index: index + 1 }), undefined, newChain);
             }
 	    index+=1
         }
         offset+=playlistItems.limit;
 	if (offset > playlistItems.totalNumberOfItems) { break; }
     }
-    if (onProgress) onProgress({ type: 'playlist', id: playlist.uuid, title: playlist.title, progress: 100, message: 'Downloaded all items' });
+    if (onProgress) onProgress({ type: 'playlist', id: playlist.uuid, title: playlist.title, progress: 100, message: 'Downloaded all items', chain });
 }
 
 async function downloadArtistAlbums(artistId: string | number, singles: boolean, onProgress?: ProgressCb): Promise<void> {
     const api = new TidalApi();
     const artist = await api.getArtist(artistId);
+    if (onProgress) onProgress({ type: 'artist', id: artist.id, title: artist.name, progress: 0, message: `Downloading albums for ${artist.name}`, chain: [] });
     let offset = 0;
+    const chain = [{ type: 'artist' as const, id: artist.id }];
     while (true) {
         const albums = await api.getArtistAlbums(artistId, undefined, offset, singles ? 'EPSANDSINGLES' : 'ALBUMS');
         for (const album of albums.items) {
-            await downloadAlbum(album, onProgress);
+            await downloadAlbum(album, onProgress, chain);
         }
         offset += albums.limit;
         if (offset > albums.totalNumberOfItems) { break; }
     }
+    if (onProgress) onProgress({ type: 'artist', id: artist.id, title: artist.name, progress: 100, message: 'Downloaded all albums', chain: [] });
 }
 
 export async function downloadUrl(url: string, onProgress?: ProgressCb) {
@@ -195,7 +206,7 @@ export async function downloadUrl(url: string, onProgress?: ProgressCb) {
             const track = await api.getTrack(resource.id);
             const album = await api.getAlbum(track.album.id);
             await downloadTrack(track, (progress) => {
-                if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: progress.progress, message: progress.message });
+                if (onProgress) onProgress({ ...progress });
             }, undefined, { album_artist: album.artist.name });
             break;
         }
@@ -208,11 +219,11 @@ export async function downloadUrl(url: string, onProgress?: ProgressCb) {
             if (video.album) {
                 const videoAlbum = await api.getAlbum(video.album.id);
                 await downloadVideo(video, (progress) => {
-                    if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: progress.progress, message: progress.message });
+                    if (onProgress) onProgress({ ...progress });
                 }, undefined, { album_artist: videoAlbum.artist.name });
             } else {
                 await downloadVideo(video, (progress) => {
-                    if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: progress.progress, message: progress.message });
+                    if (onProgress) onProgress({ ...progress });
                 });
             }
             break;

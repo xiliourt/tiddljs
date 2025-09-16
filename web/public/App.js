@@ -1,31 +1,73 @@
-const Progress = ({ item }) => {
-    const [isCollapsed, setIsCollapsed] = React.useState(true);
+const Track = ({ item }) => {
     const isCompleted = item.progress === 100;
-
-    if (item.type === 'album') {
-        return (
-            <div id={`album-${item.id}`} className={`status-item ${isCompleted ? 'completed' : ''}`}>
-                <strong onClick={() => setIsCollapsed(!isCollapsed)} style={{ cursor: 'pointer' }}>
-                    {isCollapsed ? '▶' : '▼'} {item.type}: {item.title}
-                </strong>
-                <div>{item.message}</div>
-                <progress value={item.progress} max="100" />
-                {!isCollapsed && (
-                    <div style={{ marginLeft: '20px', marginTop: '10px' }}>
-                        {item.tracks.map((track) => (
-                            <Progress key={`${track.type}-${track.id}`} item={track} />
-                        ))}
-                    </div>
-                )}
-            </div>
-        );
-    }
-
     return (
         <div id={`track-${item.id}`} className={`status-item ${isCompleted ? 'completed' : ''}`}>
             <strong>{item.type}: {item.title}</strong>
             <div>{item.message}</div>
             <progress value={item.progress} max="100" />
+        </div>
+    );
+};
+
+const Album = ({ item }) => {
+    const [isCollapsed, setIsCollapsed] = React.useState(true);
+    const isCompleted = item.progress === 100;
+    return (
+        <div id={`album-${item.id}`} className={`status-item ${isCompleted ? 'completed' : ''}`}>
+            <strong onClick={() => setIsCollapsed(!isCollapsed)} style={{ cursor: 'pointer' }}>
+                {isCollapsed ? '▶' : '▼'} {item.type}: {item.title}
+            </strong>
+            <div>{item.message}</div>
+            <progress value={item.progress} max="100" />
+            {!isCollapsed && (
+                <div style={{ marginLeft: '20px', marginTop: '10px' }}>
+                    {Object.values(item.items || {}).map((track) => (
+                        <Track key={`${track.type}-${track.id}`} item={track} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const Playlist = ({ item }) => {
+    const [isCollapsed, setIsCollapsed] = React.useState(true);
+    const isCompleted = item.progress === 100;
+    return (
+        <div id={`playlist-${item.id}`} className={`status-item ${isCompleted ? 'completed' : ''}`}>
+            <strong onClick={() => setIsCollapsed(!isCollapsed)} style={{ cursor: 'pointer' }}>
+                {isCollapsed ? '▶' : '▼'} {item.type}: {item.title}
+            </strong>
+            <div>{item.message}</div>
+            <progress value={item.progress} max="100" />
+            {!isCollapsed && (
+                <div style={{ marginLeft: '20px', marginTop: '10px' }}>
+                    {Object.values(item.items || {}).map((track) => (
+                        <Track key={`${track.type}-${track.id}`} item={track} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const Artist = ({ item }) => {
+    const [isCollapsed, setIsCollapsed] = React.useState(true);
+    const isCompleted = item.progress === 100;
+    return (
+        <div id={`artist-${item.id}`} className={`status-item ${isCompleted ? 'completed' : ''}`}>
+            <strong onClick={() => setIsCollapsed(!isCollapsed)} style={{ cursor: 'pointer' }}>
+                {isCollapsed ? '▶' : '▼'} {item.type}: {item.title}
+            </strong>
+            <div>{item.message}</div>
+            <progress value={item.progress} max="100" />
+            {!isCollapsed && (
+                <div style={{ marginLeft: '20px', marginTop: '10px' }}>
+                    {Object.values(item.items || {}).map((album) => (
+                        <Album key={`${album.type}-${album.id}`} item={album} />
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
@@ -48,40 +90,23 @@ const App = () => {
 
         socketRef.current.on('progress', (data) => {
             setProgress(prev => {
-                const newProgress = { ...prev };
+                const newProgress = JSON.parse(JSON.stringify(prev)); // Deep copy to avoid mutation
+                let currentLevel = newProgress;
 
-                if (data.type === 'album') {
-                    const existingAlbum = newProgress[data.id] || { tracks: [] };
-                    newProgress[data.id] = {
-                        ...existingAlbum,
-                        ...data,
-                    };
-                } else if (data.albumId) {
-                    const existingAlbum = newProgress[data.albumId] || {
-                        type: 'album',
-                        id: data.albumId,
-                        title: 'Loading album...',
-                        progress: 0,
-                        message: '',
-                        tracks: [],
-                    };
-
-                    const newTracks = [...existingAlbum.tracks];
-                    const existingIndex = newTracks.findIndex(p => p.id === data.id && p.type === data.type);
-
-                    if (existingIndex !== -1) {
-                        newTracks[existingIndex] = data;
-                    } else {
-                        newTracks.push(data);
+                for (const link of data.chain) {
+                    if (!currentLevel[link.id]) {
+                        currentLevel[link.id] = { type: link.type, id: link.id, title: 'Loading...', progress: 0, message: '', items: {} };
                     }
-                    
-                    newProgress[data.albumId] = {
-                        ...existingAlbum,
-                        tracks: newTracks,
-                    };
-                } else {
-                    newProgress[`${data.type}-${data.id}`] = data;
+                    currentLevel = currentLevel[link.id].items;
                 }
+
+                const existingItem = currentLevel[data.id] || {};
+                currentLevel[data.id] = {
+                    ...existingItem,
+                    ...data,
+                    items: existingItem.items || {}
+                };
+
                 return newProgress;
             });
         });
@@ -106,11 +131,18 @@ const App = () => {
                 <button onClick={handleDownload}>Download</button>
             </div>
             <div className="status">
-                {Object.values(progress)
-                    .filter(p => p.type !== 'track' || !p.albumId)
-                    .map((p) => (
-                        <Progress key={`${p.type}-${p.id}`} item={p} />
-                    ))}
+                {Object.values(progress).map((p) => {
+                    if (p.type === 'artist') {
+                        return <Artist key={`${p.type}-${p.id}`} item={p} />;
+                    }
+                    if (p.type === 'album') {
+                        return <Album key={`${p.type}-${p.id}`} item={p} />;
+                    }
+                    if (p.type === 'playlist') {
+                        return <Playlist key={`${p.type}-${p.id}`} item={p} />;
+                    }
+                    return <Track key={`${p.type}-${p.id}`} item={p} />;
+                })}
             </div>
         </div>
     );
