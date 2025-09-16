@@ -1,7 +1,7 @@
 
 import { TidalApi } from './api';
 import { downloadTrackStream, downloadVideoStream } from './download';
-import { tidalResourceFromString, formatResource } from './utils';
+import { tidalResourceFromString, formatResource, getPath } from './utils';
 import { getConfig } from './config';
 import { addTrackMetadata, addVideoMetadata, Cover } from './metadata';
 import { ARG_TO_QUALITY } from './models/constants';
@@ -15,6 +15,7 @@ export interface Progress {
     title: string;
     progress: number;
     message: string;
+    albumId?: string | number;
 }
 
 export interface ProgressCb {
@@ -26,7 +27,7 @@ async function downloadTrack(track: Track, onProgress?: ProgressCb, template?: s
     const config = getConfig();
     try {
         const stream = await api.getTrackStream(track.id, ARG_TO_QUALITY[config.download.quality]);
-        const baseName = formatResource(template || config.template.track, track, options);
+        const baseName = getPath('track', track, options);
         const finalFilePath = join(config.download.path, `${baseName}.flac`);
         const tempFilePath = parse(join(config.download.path, `${baseName}.tmp`));
 
@@ -84,7 +85,7 @@ async function downloadVideo(video: Video, onProgress?: ProgressCb, template?: s
     const config = getConfig();
     try {
         const stream = await api.getVideoStream(video.id);
-        const baseName = formatResource(template || config.template.video, video, options);
+        const baseName = getPath('video', video, options);
         const finalFilePath = join(config.download.path, `${baseName}.mp4`);
         const tempFilePath = parse(join(config.download.path, `${baseName}.tmp`));
         if (!existsSync(tempFilePath.dir)) {
@@ -131,12 +132,12 @@ async function downloadAlbum(album: Album, onProgress?: ProgressCb): Promise<voi
             const itemProgress = (index / albumItems.totalNumberOfItems) * 100;
             if (item.type === 'track') {
                 await downloadTrack(item.item as Track, (progress) => {
-                    if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: itemProgress + (progress.progress / albumItems.totalNumberOfItems), message: `Downloading track ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
-                }, config.template.album, { album_artist: fullAlbum.artist.name });
+                    if (onProgress) onProgress({ ...progress, albumId: album.id, message: `Downloading track ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
+                }, getPath('album', item.item as Track, { album_artist: fullAlbum.artist.name }));
             } else if (item.type === 'video' && config.download.download_video) {
                 await downloadVideo(item.item as Video, (progress) => {
-                    if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: itemProgress + (progress.progress / albumItems.totalNumberOfItems), message: `Downloading video ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
-                }, config.template.album, { album_artist: fullAlbum.artist.name });
+                    if (onProgress) onProgress({ ...progress, albumId: album.id, message: `Downloading video ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
+                }, getPath('album', item.item as Video, { album_artist: fullAlbum.artist.name }));
             }
             index+=1;
         }
@@ -158,13 +159,9 @@ async function downloadPlaylist(playlist: Playlist, onProgress?: ProgressCb): Pr
         for (const [num, item] of playlistItems.items.entries()) {
             const itemProgress = (index / playlistItems.totalNumberOfItems) * 100;
             if (item.type === 'track') {
-                await downloadTrack(item.item as Track, (progress) => {
-                    if (onProgress) onProgress({ type: 'playlist', id: playlist.uuid, title: playlist.title, progress: itemProgress + (progress.progress / playlistItems.totalNumberOfItems), message: `Downloading track ${index + 1}/${playlistItems.totalNumberOfItems}: ${item.item.title}` });
-                }, config.template.playlist, { playlist_title: playlist.title, playlist_index: index + 1 });
+                await downloadTrack(item.item as Track, onProgress, getPath('playlist', item.item as Track, { playlist_title: playlist.title, playlist_index: index + 1 }));
             } else if (item.type === 'video' && config.download.download_video) {
-                await downloadVideo(item.item as Video, (progress) => {
-                    if (onProgress) onProgress({ type: 'playlist', id: playlist.uuid, title: playlist.title, progress: itemProgress + (progress.progress / playlistItems.totalNumberOfItems), message: `Downloading video ${index + 1}/${playlistItems.totalNumberOfItems}: ${item.item.title}` });
-                }, config.template.playlist, { playlist_title: playlist.title, playlist_index: index + 1 });
+                await downloadVideo(item.item as Video, onProgress, getPath('playlist', item.item as Video, { playlist_title: playlist.title, playlist_index: index + 1 }));
             }
 	    index+=1
         }
@@ -181,9 +178,7 @@ async function downloadArtistAlbums(artistId: string | number, singles: boolean,
     while (true) {
         const albums = await api.getArtistAlbums(artistId, undefined, offset, singles ? 'EPSANDSINGLES' : 'ALBUMS');
         for (const album of albums.items) {
-            await downloadAlbum(album, (progress) => {
-                if (onProgress) onProgress({ type: 'artist', id: artist.id, title: artist.name, progress: progress.progress, message: `Downloading album ${album.title}: ${progress.message}` });
-            });
+            await downloadAlbum(album, onProgress);
         }
         offset += albums.limit;
         if (offset > albums.totalNumberOfItems) { break; }

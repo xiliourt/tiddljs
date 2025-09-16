@@ -1,7 +1,8 @@
-import { Track, Video } from './models/resource';
+import { Track, Video, Album, Playlist } from './models/resource';
 import { QUALITY_TO_ARG, TrackQuality } from './models/constants';
 import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { getConfig } from './config';
 
 export type ResourceType = 'track' | 'video' | 'album' | 'playlist' | 'artist';
 
@@ -38,7 +39,7 @@ export function tidalResourceFromString(str: string): TidalResource {
 }
 
 export function sanitizeString(str: string): string {
-    return str.replace(/[\\\":'*?<>|]+/g, '');
+    return str.replace(/[\\":'*?<>|]+/g, '');
 }
 
 export function formatResource(
@@ -108,4 +109,20 @@ export function getTrackExtension(track: Track, quality: TrackQuality): string {
         return '.flac';
     }
     return '.m4a';
+}
+
+export function getPath(resourceType: ResourceType, resource: Track | Video | Album | Playlist, options?: any): string {
+    const config = getConfig();
+    switch (resourceType) {
+        case 'track':
+            return formatResource(config.template.track, resource as Track, options);
+        case 'video':
+            return formatResource(config.template.video, resource as Video, options);
+        case 'album':
+            return formatResource(config.template.album, resource as Track, options);
+        case 'playlist':
+            return formatResource(config.template.playlist, resource as Track, options);
+        default:
+            throw new Error(`Unknown resource type: ${resourceType}`);
+    }
 }
