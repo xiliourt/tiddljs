@@ -1,5 +1,5 @@
 # Diagram
-![diagram](https://github.com/xiliourt/tiddljs/blob/main/diagram.png?raw=true)
+![diagram](https://raw.githubusercontent.com/xiliourt/tiddljs/refs/heads/main/diagram.png)
 
 ### Tested (Working)
 - Skips if file exists already
