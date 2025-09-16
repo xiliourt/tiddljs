@@ -1,0 +1,166 @@
+classDiagram
+    direction LR
+
+    subgraph src {
+        class Index_Module {
+            <<Module>>
+            +main()
+        }
+
+        class DownloadUrl_Module {
+            <<Module>>
+            +downloadUrl(url, onProgress)
+        }
+
+        class Auth_Module {
+            <<Module>>
+            +login()
+            +logout()
+            +refreshToken()
+        }
+
+        class TidalApi {
+            -session: AxiosInstance
+            +getAlbum(id): AlbumFull
+            +getTrack(id): Track
+            +getArtist(id): ArtistFull
+            +getPlaylist(id): Playlist
+            +getTrackStream(id, quality): TrackStream
+            +getLyrics(id): Lyrics
+            +getVideoStream(id): VideoStream
+        }
+
+        class Config_Module {
+            <<Module>>
+            +getConfig(): Config
+            +saveConfig(Config)
+        }
+
+        class Utils_Module {
+            <<Module>>
+            +formatResource(template, resource, options)
+            +tidalResourceFromString(url): TidalResource
+        }
+
+        class ApiError {
+            <<Error>>
+        }
+        class AuthError {
+            <<Error>>
+        }
+    }
+
+    subgraph "src/lib" {
+        class MonitorablePromise {
+            +on(event, callback)
+            +then()
+            +catch()
+        }
+    }
+
+    subgraph "src/types" {
+        class IProgress {
+            <<Interface>>
+            type
+            id
+            title
+            progress
+            message
+        }
+        class IProgressUpdate {
+            <<Interface>>
+            progress
+            message
+        }
+        class ITrackDownloadResult {
+            <<Interface>>
+            data: Buffer
+            fileExtension: string
+        }
+    }
+
+    subgraph "src/metadata" {
+        class Metadata_Module {
+            <<Module>>
+            +addTrackMetadata(path, track, ext, coverPath, credits, album_artist, lyrics)
+            +addVideoMetadata(path, video)
+        }
+        class Cover {
+            -uid: string
+            -url: string
+            +save(directoryPath): string
+        }
+    }
+
+    subgraph "src/download" {
+        class Download_Module {
+            <<Module>>
+            +downloadTrackStream(trackStream): MonitorablePromise
+            +downloadVideoStream(videoStream): MonitorablePromise
+        }
+    }
+
+    subgraph "src/models" {
+        class Resource_Models {
+            <<Module>>
+            Track
+            Video
+            Album
+            AlbumFull
+            Playlist
+            Artist
+            ArtistFull
+        }
+        class Api_Models {
+            <<Module>>
+            TrackStream
+            VideoStream
+            Lyrics
+            AlbumItems
+            PlaylistItems
+        }
+        class Auth_Models {
+            <<Module>>
+            AuthResponse
+            AuthDeviceResponse
+        }
+        class Constants_Models {
+            <<Enumeration>>
+            TrackQuality
+            TrackArg
+            SinglesFilter
+        }
+    }
+
+    ' --- Relationships ---
+    Index_Module ..> DownloadUrl_Module : uses
+    Index_Module ..> Auth_Module : uses
+
+    DownloadUrl_Module ..> TidalApi : uses
+    DownloadUrl_Module ..> Download_Module : uses
+    DownloadUrl_Module ..> Metadata_Module : uses
+    DownloadUrl_Module ..> Config_Module : uses
+    DownloadUrl_Module ..> Utils_Module : uses
+    DownloadUrl_Module ..> IProgress : uses
+
+    Auth_Module ..> Config_Module : uses
+    Auth_Module ..> Auth_Models : uses
+    Auth_Module ..> AuthError : throws
+
+    TidalApi ..> Config_Module : uses
+    TidalApi ..> Api_Models : uses
+    TidalApi ..> Resource_Models : uses
+    TidalApi ..> ApiError : throws
+
+    Download_Module ..> MonitorablePromise : creates
+    Download_Module ..> Api_Models : uses
+    Download_Module ..> ITrackDownloadResult : resolves
+    MonitorablePromise ..> IProgressUpdate : notifies
+
+    Metadata_Module ..> Resource_Models : uses
+    Cover ..> "axios"
+
+    Utils_Module ..> Resource_Models : uses
+    Utils_Module ..> Constants_Models : uses
+
+    Api_Models ..> Resource_Models : contains
