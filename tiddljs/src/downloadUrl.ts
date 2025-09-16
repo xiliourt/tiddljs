@@ -17,7 +17,9 @@ export interface Progress {
     message: string;
 }
 
-export type ProgressCb = (progress: Progress) => void;
+export interface ProgressCb {
+    (progress: Progress): void;
+}
 
 async function downloadTrack(track: Track, onProgress?: ProgressCb, template?: string, options?: { album_artist?: string; playlist_title?: string; playlist_index?: number; }): Promise<void> {
     const api = new TidalApi();
@@ -43,7 +45,7 @@ async function downloadTrack(track: Track, onProgress?: ProgressCb, template?: s
             if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: update.progress, message: update.message });
         });
 
-        const { data, fileExtension } = await downloadTask;
+        const data = await downloadTask;
 
         writeFileSync(format(tempFilePath), data);
         if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: 'Adding metadata' });
@@ -62,10 +64,10 @@ async function downloadTrack(track: Track, onProgress?: ProgressCb, template?: s
             const cover = new Cover(track.album.cover);
             const coverPath = await cover.save(config.download.path);
             if (coverPath) {
-                await addTrackMetadata(format(tempFilePath), track, fileExtension, coverPath, [], options?.album_artist, lyrics);
+                await addTrackMetadata(format(tempFilePath), track, coverPath, [], options?.album_artist, lyrics);
             }
         } else {
-            await addTrackMetadata(format(tempFilePath), track, fileExtension, undefined, [], options?.album_artist, lyrics);
+            await addTrackMetadata(format(tempFilePath), track, undefined, [], options?.album_artist, lyrics);
         }
         if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: 'Downloaded and processed' });
     } catch (error) {

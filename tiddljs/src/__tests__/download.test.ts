@@ -17,9 +17,8 @@ describe('download', () => {
                 audioQuality: 'LOSSLESS',
             } as TrackStream;
 
-            const { urls, fileExtension } = parseTrackStream(trackStream);
+            const { urls } = parseTrackStream(trackStream);
             expect(urls).toEqual(['http://test.com/1.flac']);
-            expect(fileExtension).toBe('.flac');
         });
     });
 
@@ -35,11 +34,10 @@ describe('download', () => {
             } as TrackStream;
             mockedAxios.get.mockResolvedValue({ data: Buffer.from('test data') });
 
-            const { data, fileExtension } = await downloadTrackStream(trackStream);
+            const data = await downloadTrackStream(trackStream);
 
             expect(mockedAxios.get).toHaveBeenCalledWith('http://test.com/1.flac', { responseType: 'arraybuffer' });
             expect(data.toString()).toBe('test data');
-            expect(fileExtension).toBe('.flac');
         });
     });
 

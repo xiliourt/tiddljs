@@ -40,7 +40,8 @@ describe('auth', () => {
             // Suppress console.log
             const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
-            await login();
+            const { loginPromise } = await login();
+            await loginPromise;
 
             expect(mockedAxios.post).toHaveBeenCalledWith(expect.stringContaining('device_authorization'), expect.any(URLSearchParams));
             expect(mockedAxios.post).toHaveBeenCalledWith(expect.stringContaining('token'), expect.any(URLSearchParams), expect.any(Object));
@@ -64,7 +65,8 @@ describe('auth', () => {
                 access_token: 'new-access-token',
                 expires_in: 3600,
             };
-            mockedGetConfig.mockReturnValue({ auth: { refresh_token: 'test-refresh-token' } });
+            const config = { auth: { refresh_token: 'test-refresh-token', token: 'test-access-token' } };
+            mockedGetConfig.mockReturnValue(config);
             mockedAxios.post.mockResolvedValueOnce({ data: refreshTokenResponse });
 
             await refreshToken();

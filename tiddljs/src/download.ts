@@ -49,7 +49,7 @@ function parseManifestXML(xmlContent: string): { urls: string[]; codecs: string 
     return { urls, codecs };
 }
 
-export function parseTrackStream(trackStream: TrackStream): { urls: string[]; fileExtension: string } {
+export function parseTrackStream(trackStream: TrackStream): { urls: string[] } {
     const decodedManifest = Buffer.from(trackStream.manifest, 'base64').toString('utf-8');
     let urls: string[];
     let codecs: string;
@@ -79,16 +79,16 @@ export function parseTrackStream(trackStream: TrackStream): { urls: string[]; fi
         throw new Error(`Unknown codecs: ${codecs} (trackId ${trackStream.trackId})`);
     }
 
-    return { urls, fileExtension };
+    return { urls };
 }
 
-export function downloadTrackStream(trackStream: TrackStream): MonitorablePromise<TrackDownloadResult> {
+export function downloadTrackStream(trackStream: TrackStream): MonitorablePromise<Buffer> {
     // The return type is now a MonitorablePromise with our custom result type
-    return new MonitorablePromise<TrackDownloadResult>((resolve, reject, notify) => {
+    return new MonitorablePromise<Buffer>((resolve, reject, notify) => {
         (async () => {
             try {
                 notify({ progress: 0, message: 'Parsing track stream manifest...' });
-                const { urls, fileExtension } = await parseTrackStream(trackStream);
+                const { urls } = await parseTrackStream(trackStream);
                 const totalUrls = urls.length;
 
                 if (totalUrls === 0) { return reject("No track segments to download"); }
@@ -110,7 +110,7 @@ export function downloadTrackStream(trackStream: TrackStream): MonitorablePromis
                     });
                 }
                 
-                resolve({ data: Buffer.concat(streamData), fileExtension});
+                resolve(Buffer.concat(streamData));
 
             } catch (error) {
                 // If any step fails, reject the promise

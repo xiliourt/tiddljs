@@ -9,7 +9,6 @@ import { rename, unlink } from 'fs';
 export async function addTrackMetadata(
     trackPath: string,
     track: Track,
-    fileExtension: string,
     coverPath?: string,
     credits: ItemWithCredits['credits'] = [],
     album_artist = '',
