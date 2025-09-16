@@ -75,6 +75,9 @@ const Artist = ({ item }) => {
 const App = () => {
     const [url, setUrl] = React.useState('');
     const [progress, setProgress] = React.useState({});
+    const [isAuthed, setIsAuthed] = React.useState(false);
+    const [deviceCode, setDeviceCode] = React.useState(null);
+    const [timer, setTimer] = React.useState(null);
     const socketRef = React.useRef(null);
 
     React.useEffect(() => {
@@ -82,10 +85,28 @@ const App = () => {
 
         socketRef.current.on('connect', () => {
             console.log(`connected: ${socketRef.current.id}`);
+            socketRef.current.emit('getAuthStatus');
         });
 
         socketRef.current.on('disconnect', () => {
             console.log(`disconnected: ${socketRef.current.id}`);
+        });
+
+        socketRef.current.on('initialState', (data) => {
+            setProgress(data);
+        });
+
+        socketRef.current.on('authStatus', (status) => {
+            setIsAuthed(status);
+            if (status) {
+                setDeviceCode(null);
+                setTimer(null);
+            }
+        });
+
+        socketRef.current.on('deviceCode', (code) => {
+            setDeviceCode(code);
+            setTimer(300);
         });
 
         socketRef.current.on('progress', (data) => {
@@ -118,18 +139,50 @@ const App = () => {
         return () => socketRef.current.disconnect();
     }, []);
 
+    React.useEffect(() => {
+        if (timer > 0) {
+            const interval = setInterval(() => {
+                setTimer(prev => prev - 1);
+            }, 1000);
+            return () => clearInterval(interval);
+        }
+    }, [timer]);
+
     const handleDownload = () => {
         setProgress({});
         socketRef.current.emit('download', url);
     };
 
+    const handleLogin = () => socketRef.current.emit('login');
+    const handleLogout = () => socketRef.current.emit('logout');
+    const handleRefresh = () => socketRef.current.emit('refresh');
+
     return (
         <div>
             <h1>TiddlExpressJs - WebUI Example</h1>
-            <div className="url-bar">
-                <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Enter a Tidal URL" />
-                <button onClick={handleDownload}>Download</button>
+            <div className="auth-buttons">
+                {isAuthed ? (
+                    <>
+                        <button onClick={handleLogout}>Logout</button>
+                        <button onClick={handleRefresh}>Refresh</button>
+                    </>
+                ) : (
+                    <button onClick={handleLogin}>Login</button>
+                )}
             </div>
+            {deviceCode && (
+                <div className="login-block">
+                    <h2>Login with Tidal</h2>
+                    <button className="login-button" onClick={() => window.open(`https://${deviceCode.verificationUriComplete}`, '_blank')}>Click to Login with Tidal</button>
+                    {timer > 0 && <p>Expires in: {Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, '0')}</p>}
+                </div>
+            )}
+            {isAuthed && (
+                <div className="url-bar">
+                    <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Enter a Tidal URL" />
+                    <button onClick={handleDownload}>Download</button>
+                </div>
+            )}
             <div className="status">
                 {Object.values(progress).map((p) => {
                     if (p.type === 'artist') {

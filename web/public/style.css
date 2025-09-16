@@ -66,13 +66,53 @@ h1 {
     margin-right: 0.5rem;
 }
 
-.url-bar button {
+.url-bar button, .auth-buttons button, .login-button {
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 0.25rem;
     background-color: #2563eb;
     color: white;
     cursor: pointer;
+}
+
+.login-button {
+    font-size: 1.25rem;
+    font-weight: bold;
+    padding: 1rem 2rem;
+}
+
+.auth-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.login-block {
+    text-align: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 0.25rem;
+}
+
+.login-block h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: #2563eb;
+}
+
+.login-block a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.login-block a:hover {
+    text-decoration: underline;
+}
+
+.login-block p {
+    margin: 0;
 }
 
 .status {
