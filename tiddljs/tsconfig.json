@@ -6,6 +6,7 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "./dist",
+    "declaration": true,
     "typeRoots": ["./src/types", "./node_modules/@types"]
   },
   "include": ["src/**/*.ts"],

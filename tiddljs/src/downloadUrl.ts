@@ -226,7 +226,7 @@ export async function downloadUrl(url: string, onProgress?: ProgressCb) {
             const track = await api.getTrack(resource.id);
             const album = await api.getAlbum(track.album.id);
             await downloadTrack(track, (progress) => {
-                if (onProgress) onProgress({ ...progress });
+                if (onProgress) onProgress({ ...progress, chain: [] });
             }, undefined, { album_artist: album.artist.name });
             break;
         }
@@ -239,11 +239,11 @@ export async function downloadUrl(url: string, onProgress?: ProgressCb) {
             if (video.album) {
                 const videoAlbum = await api.getAlbum(video.album.id);
                 await downloadVideo(video, (progress) => {
-                    if (onProgress) onProgress({ ...progress });
+                    if (onProgress) onProgress({ ...progress, chain: [] });
                 }, undefined, { album_artist: videoAlbum.artist.name });
             } else {
                 await downloadVideo(video, (progress) => {
-                    if (onProgress) onProgress({ ...progress });
+                    if (onProgress) onProgress({ ...progress, chain: [] });
                 });
             }
             break;

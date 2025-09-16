@@ -1,0 +1,41 @@
+{
+  "name": "tidarr-react",
+  "private": true,
+  "devDependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.2",
+    "@mui/material": "^7.3.2",
+    "@types/node": "^24.4.0",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.2",
+    "event-source-plus": "0.1.12",
+    "globals": "^16.4.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^7.9.1",
+    "vite": "^7.1.5"
+  },
+  "scripts": {
+    "start": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "depcheck": "npx depcheck"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "dependencies": {
+    "markdown-to-jsx": "^7.7.13"
+  }
+}
