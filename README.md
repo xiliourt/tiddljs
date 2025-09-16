@@ -1,3 +1,6 @@
+# Diagram
+![diagram](https://github.com/xiliourt/tiddljs/blob/main/diagram.png?raw=true)
+
 ### Tested (Working)
 - Skips if file exists already
 - Track, Video, Artist, Album, Playlist downloading (node index.js url <URL>) (no 'download' command, just the <URL>).
