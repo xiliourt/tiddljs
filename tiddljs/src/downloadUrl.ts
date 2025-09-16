@@ -31,7 +31,7 @@ async function downloadTrack(track: Track, onProgress?: ProgressCb, template?: s
         if (!existsSync(tempFilePath.dir)) {
             mkdirSync(tempFilePath.dir, { recursive: true });
         } else if (existsSync(finalFilePath)) {
-            console.warn(`Skipped ${track.title} - exists`);
+            if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: 100, message: `Skipped ${track.title} - exists`});
             return;
         }
 
@@ -90,6 +90,7 @@ async function downloadVideo(video: Video, onProgress?: ProgressCb, template?: s
         }
         else if (existsSync(finalFilePath)) {
             console.warn(`Skipped ${video.title} - exists`)
+            if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: 100, message: `Skipped ${video.title} - exists`})
             return;
         }
 
@@ -191,7 +192,9 @@ export async function downloadUrl(url: string, onProgress?: ProgressCb) {
     switch (resource.type) {
         case 'track':
             const track = await api.getTrack(resource.id);
-            await downloadTrack(track, onProgress);
+            await downloadTrack(track, (progress) => {
+                if (onProgress) onProgress({ type: 'track', id: track.id, title: track.title, progress: progress.progress, message: progress.message });
+            });
             break;
         case 'video':
             const config = getConfig();
@@ -200,7 +203,9 @@ export async function downloadUrl(url: string, onProgress?: ProgressCb) {
                 break;
             }
             const video = await api.getVideo(resource.id);
-            await downloadVideo(video, onProgress);
+            await downloadVideo(video, (progress) => {
+                if (onProgress) onProgress({ type: 'video', id: video.id, title: video.title, progress: progress.progress, message: progress.message });
+            });
             break;
         case 'album':
             const album = await api.getAlbum(resource.id);
