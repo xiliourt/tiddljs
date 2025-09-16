@@ -123,16 +123,16 @@ async function downloadAlbum(album: Album, onProgress?: ProgressCb): Promise<voi
     let offset=0;
     if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: 0, message: `Downloading album with ${albumItemsLength.totalNumberOfItems} items` });
     while (true) {
-        const albumItems = await api.getAlbumItems(album.id);
+        const albumItems = await api.getAlbumItems(album.id, undefined, offset);
         for (const [num, item] of albumItems.items.entries()) {
             const itemProgress = (index / albumItems.totalNumberOfItems) * 100;
             if (item.type === 'track') {
                 await downloadTrack(item.item as Track, (progress) => {
-                    if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: itemProgress + (progress.progress / albumItems.items.length), message: `Downloading track ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
+                    if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: itemProgress + (progress.progress / albumItems.totalNumberOfItems), message: `Downloading track ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
                 }, config.template.album, { album_artist: fullAlbum.artist.name });
             } else if (item.type === 'video' && config.download.download_video) {
                 await downloadVideo(item.item as Video, (progress) => {
-                    if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: itemProgress + (progress.progress / albumItems.totalNumberOfItems), message: `Downloading video ${index + 1}/${albumItems.items.length}: ${item.item.title}` });
+                    if (onProgress) onProgress({ type: 'album', id: album.id, title: album.title, progress: itemProgress + (progress.progress / albumItems.totalNumberOfItems), message: `Downloading video ${index + 1}/${albumItems.totalNumberOfItems}: ${item.item.title}` });
                 }, config.template.album, { album_artist: fullAlbum.artist.name });
             }
             index+=1;
@@ -151,12 +151,12 @@ async function downloadPlaylist(playlist: Playlist, onProgress?: ProgressCb): Pr
     let offset = 0;
     let index = 0;
     while (true) {
-        const playlistItems = await api.getPlaylistItems(playlist.uuid, offset);
+        const playlistItems = await api.getPlaylistItems(playlist.uuid, undefined, offset);
         for (const [num, item] of playlistItems.items.entries()) {
             const itemProgress = (index / playlistItems.totalNumberOfItems) * 100;
             if (item.type === 'track') {
                 await downloadTrack(item.item as Track, (progress) => {
-                    if (onProgress) onProgress({ type: 'playlist', id: playlist.uuid, title: playlist.title, progress: itemProgress + (progress.progress / playlistItems.totalNumberOfItems), message: `Downloading track ${index + 1}/${playlistItems.items.length}: ${item.item.title}` });
+                    if (onProgress) onProgress({ type: 'playlist', id: playlist.uuid, title: playlist.title, progress: itemProgress + (progress.progress / playlistItems.totalNumberOfItems), message: `Downloading track ${index + 1}/${playlistItems.totalNumberOfItems}: ${item.item.title}` });
                 }, config.template.playlist, { playlist_title: playlist.title, playlist_index: index + 1 });
             } else if (item.type === 'video' && config.download.download_video) {
                 await downloadVideo(item.item as Video, (progress) => {
